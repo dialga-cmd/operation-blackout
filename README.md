@@ -1,11 +1,11 @@
-# OPERATION BLACKOUT 🚀
+# OPERATION BLACKOUT
 ### Advanced Linux Forensics & Incident Response CTF Platform
 
 **Operation Blackout** is a high-security, retro-pixel themed Capture-The-Flag (CTF) competition platform built on Next.js 15, TypeScript, and Supabase. Participants operate an in-browser virtualized Linux terminal to investigate system breach incidents, analyze obfuscated filesystems, extract encryptions, decode binary payloads, and track attacker footprints across 3 escalating rounds.
 
 ---
 
-## 🌟 Key Features & Architecture
+## Key Features & Architecture
 
 ### 1. **Realistic Terminal UX & Anti-Frustration System**
 - **Continuous Auto-Focus:** Keeps input focused seamlessly so participants never have to click the terminal window repeatedly.
@@ -108,7 +108,7 @@ Render will automatically detect the included multi-stage `Dockerfile`. Select *
 
 ---
 
-## 📜 Local Development
+## Local Development
 
 ```bash
 # Install dependencies
