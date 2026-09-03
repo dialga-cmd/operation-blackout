@@ -4,10 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 import { getTodayDate } from "@/lib/crypto/flag-key";
 import { buildExpectedFlag, DECOY_FLAGS } from "@/lib/server/flag-answer";
 
-const admin = createAdminClient();
-
 export async function POST(request: Request) {
   try {
+    const admin = createAdminClient();
     const { flag, roundId, userId } = await request.json();
 
     if (!flag || !roundId || !userId) {
