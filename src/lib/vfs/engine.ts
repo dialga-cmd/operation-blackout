@@ -58,7 +58,6 @@ export class VFSEngine {
       }
     }
 
-    // Also check for direct children by looking at parent
     for (const [nodePath, node] of this.nodes) {
       const parentDir =
         nodePath.substring(0, nodePath.lastIndexOf("/")) + "/";
@@ -159,7 +158,6 @@ export class VFSEngine {
   ): boolean {
     const p = node.permissions;
     if (node.type === "dir") {
-      // Need read permission to list; for cat on dir it's "Is a directory"
       return p[1] === "r" || p[4] === "r" || p[7] === "r";
     }
     if (node.owner === currentUser) {
@@ -186,8 +184,6 @@ export class VFSEngine {
     return this.round;
   }
 
-  // "Extract" an archive node by materializing its nested archiveContents
-  // as real nodes in the VFS so subsequent commands (strings, cat) work.
   extract(path: string, destDir: string): string[] {
     const node = this.nodes.get(path);
     if (!node || !node.archiveContents || node.archiveContents.length === 0) {
@@ -208,7 +204,6 @@ export class VFSEngine {
         this.nodes.set(materialized.path, materialized);
         extracted.push(materialized.path);
 
-        // Nested archive: materialize into its own path (mirrors bundled trees)
         if (child.archiveContents && child.archiveContents.length > 0) {
           addChildren(child.archiveContents, childPath);
         }

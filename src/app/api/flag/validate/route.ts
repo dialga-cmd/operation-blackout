@@ -17,7 +17,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Security Check: Verify authenticated session matches requested userId
     const authClient = await createClient();
     const { data: { user: sessionUser } } = await authClient.auth.getUser();
 
@@ -28,10 +27,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // Admin client bypasses RLS for cross-user operations (bans, monitoring).
     const supabase = admin;
 
-    // Check if user is banned
     const { data: banCheck } = await supabase
       .from("cheat_attempts")
       .select("status")
@@ -50,7 +47,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Anti-brute-force: cooldown + attempt cap
     const { data: recentAttempts } = await supabase
       .from("flag_attempts")
       .select("submitted_at, correct")
@@ -64,7 +60,7 @@ export async function POST(request: Request) {
       const lastAttempt = new Date(
         recentAttempts[0].submitted_at
       ).getTime();
-      const cooldownMs = 30 * 1000; // 30 second cooldown
+      const cooldownMs = 30 * 1000;
       const elapsed = now - lastAttempt;
       if (elapsed < cooldownMs && !recentAttempts[0].correct) {
         const waitSeconds = Math.ceil((cooldownMs - elapsed) / 1000);
@@ -73,7 +69,6 @@ export async function POST(request: Request) {
           message: `Too many attempts. Please wait ${waitSeconds}s before trying again.`,
         });
       }
-      // Cap: max 20 attempts per round, further attempts blocked
       if (recentAttempts.length >= 20) {
         const allWrong = recentAttempts.every((a) => !a.correct);
         if (allWrong && now - lastAttempt < 10 * 60 * 1000) {
@@ -86,7 +81,6 @@ export async function POST(request: Request) {
       }
     }
 
-    // Check for decoy flags first
     if (DECOY_FLAGS.includes(flag)) {
       await supabase.from("flag_attempts").insert({
         user_id: userId,
@@ -111,8 +105,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // If the flag doesn't match this user's expected flag,
-    // check whether it matches ANOTHER user's flag (cheating detection).
     if (flag !== expectedFlag) {
       await supabase.from("flag_attempts").insert({
         user_id: userId,
@@ -121,7 +113,6 @@ export async function POST(request: Request) {
         correct: false,
       });
 
-      // Check if this exact flag belongs to another participant today
       const { data: allParticipants } = await supabase
         .from("users")
         .select("id");
@@ -134,7 +125,6 @@ export async function POST(request: Request) {
       });
 
       if (sharedFlagUser) {
-        // CHEATING DETECTED - flag sharing
         await supabase.from("cheat_attempts").insert([
           {
             submitter_id: userId,
@@ -177,7 +167,6 @@ export async function POST(request: Request) {
       });
     }
 
-    // Flag matches! Mark as completed.
     const { data: progress } = await supabase
       .from("user_progress")
       .select("id, started_at")
@@ -193,7 +182,6 @@ export async function POST(request: Request) {
         Math.floor((completedAt.getTime() - startedAt.getTime()) / 1000)
       );
 
-      // Score: max_points - time_penalty (faster = higher score)
       const maxScore = 1000;
       const score = Math.max(100, maxScore - Math.floor(timeDiff / 10));
 
@@ -213,7 +201,6 @@ export async function POST(request: Request) {
         correct: true,
       });
 
-      // Make next round available
       const nextRound = roundId + 1;
       if (nextRound <= 3) {
         const { data: existingNext } = await supabase

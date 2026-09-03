@@ -1,13 +1,11 @@
 import crypto from "crypto";
 import { VFSNode, VFSRound } from "@/lib/types";
 
-// Deterministic seed helper using userId and roundId
 function getDeterministicSeed(userId: string, roundId: number): number {
   const hash = crypto.createHash("sha256").update(`${userId}:${roundId}:hardened_v2`).digest("hex");
   return parseInt(hash.substring(0, 8), 16);
 }
 
-// Pseudo-random generator from seed
 function seededRandom(seed: number) {
   let s = seed;
   return () => {
@@ -50,14 +48,12 @@ export function randomizeRoundVFS(roundData: VFSRound, userId: string, flagKey: 
   const seed = getDeterministicSeed(userId, roundId);
   const rng = seededRandom(seed);
 
-  // Pick deterministic randomized flag location for this participant
   const targetDirIndex = Math.floor(rng() * SHADOW_DIRECTORY_POOL.length);
   const targetDir = SHADOW_DIRECTORY_POOL[targetDirIndex];
 
   const realFilenameIndex = Math.floor(rng() * REAL_FLAG_FILENAMES.length);
   const realFilename = REAL_FLAG_FILENAMES[realFilenameIndex];
 
-  // Pick 3 decoy filenames to increase difficulty
   const decoy1Name = DECOY_FILENAMES[Math.floor(rng() * DECOY_FILENAMES.length)];
   let decoy2Name = DECOY_FILENAMES[Math.floor(rng() * DECOY_FILENAMES.length)];
   while (decoy2Name === decoy1Name) {
@@ -71,7 +67,6 @@ export function randomizeRoundVFS(roundData: VFSRound, userId: string, flagKey: 
   const nodes: VFSNode[] = [];
 
   if (roundId === 1) {
-    // Round 1 (Hard): System Reconnaissance & Obfuscated Log Traps
     const realFlagPath = `${targetDir}/${realFilename}`;
     const decoy1Path = `${targetDir}/${decoy1Name}`;
     const decoy2Path = `${targetDir}/${decoy2Name}`;
@@ -158,7 +153,6 @@ WARNING: Permission check required! Owned by group 'backup' (use id/groups).`,
   }
 
   if (roundId === 2) {
-    // Round 2 (Harder): Cron Persistence, ROT13/Base64 Steganography & Split 3-Part Flag
     const part1Name = "auth_session.part1";
     const part2Name = "auth_session.part2";
     const part3Name = "auth_session.part3";
@@ -168,10 +162,6 @@ WARNING: Permission check required! Owned by group 'backup' (use id/groups).`,
         nodes.push({
           ...node,
           content: `#!/bin/bash
-# Incident Response Script
-# Author: Security Team
-# Last Modified: 2026-01-14 02:18:00
-
 echo "=== INCIDENT RESPONSE PROTOCOL ==="
 echo "Analyzing system compromise..."
 
@@ -212,7 +202,6 @@ echo "DECOY_WARNING: Avoid false triggers in /var/log/.correlated"`,
         continue;
       }
 
-      // Add 3rd part node for increased challenge
       if (node.path === "/var/log/.archive/old_backup") {
         nodes.push({
           ...node,
@@ -239,16 +228,12 @@ echo "DECOY_WARNING: Avoid false triggers in /var/log/.correlated"`,
   }
 
   if (roundId === 3) {
-    // Round 3 (Hardest): Disguised Magic Bytes, ELF Hex Offsets, Deep Binary Forensics
     const realStashDir = targetDir;
     const realFlagFile = `${realStashDir}/${realFilename}`;
-
-    // Convert realStashDir path string to hex representation for binary inspection
     const targetDirHex = Buffer.from(realStashDir).toString("hex");
 
     for (const node of roundData.nodes) {
       if (node.path === "/home/participant/invoice.pdf") {
-        // Disguised GZIP archive with embedded ELF binary strings
         nodes.push({
           ...node,
           archiveContents: [
@@ -330,7 +315,6 @@ echo "DECOY_WARNING: Avoid false triggers in /var/log/.correlated"`,
       nodes.push(node);
     }
 
-    // Ensure realStashDir exists
     if (!nodes.some((n) => n.path === realStashDir)) {
       nodes.push({
         path: realStashDir,

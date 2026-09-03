@@ -13,7 +13,6 @@ export async function POST(request: Request) {
 
     const adminSupabase = createAdminClient();
 
-    // Verify user is admin
     let isAdmin = false;
     try {
       const { data: adminRecord } = await adminSupabase
@@ -43,7 +42,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing roundNumber" }, { status: 400 });
     }
 
-    // Update round schedule in Supabase
     const { data, error } = await adminSupabase
       .from("rounds")
       .update({

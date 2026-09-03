@@ -17,7 +17,6 @@ export async function GET(
     return NextResponse.json({ error: "Missing userId" }, { status: 400 });
   }
 
-  // Security Check: Verify authenticated session matches requested userId
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -25,7 +24,6 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized access" }, { status: 403 });
   }
 
-  // Security Check: Verify round is unlocked for this user
   if (roundId > 1) {
     const { data: prevProgress } = await supabase
       .from("user_progress")
@@ -44,7 +42,6 @@ export async function GET(
     return NextResponse.json({ error: "Invalid round" }, { status: 404 });
   }
 
-  // Generate user-specific flag key
   const todayDate = getTodayDate();
   const flagKey = generateFlagKey(userId, roundId, todayDate);
 

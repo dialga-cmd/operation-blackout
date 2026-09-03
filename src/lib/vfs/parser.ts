@@ -6,7 +6,6 @@ export function parseInput(input: string): Pipeline {
     return { commands: [] };
   }
 
-  // Split by pipes, respecting quotes
   const segments = splitByPipe(trimmed);
 
   const commands: ParsedCommand[] = segments.map((segment) => {
@@ -64,7 +63,6 @@ function splitByPipe(input: string): string[] {
 }
 
 function parseSegment(segment: string): ParsedCommand {
-  // Check for redirect
   let redirect: ParsedCommand["redirect"];
   let cleanSegment = segment;
 
@@ -79,7 +77,6 @@ function parseSegment(segment: string): ParsedCommand {
     redirect = { file: redirectMatch[2].trim(), append: false };
   }
 
-  // Tokenize
   const tokens = tokenize(cleanSegment);
 
   if (tokens.length === 0) {

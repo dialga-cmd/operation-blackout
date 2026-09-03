@@ -14,7 +14,6 @@ export async function POST(request: Request) {
 
     const supabase = await createClient();
 
-    // Verify user is authenticated as this user
     const { data: { user } } = await supabase.auth.getUser();
     if (!user || user.id !== userId) {
       return NextResponse.json(

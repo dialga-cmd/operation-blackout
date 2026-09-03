@@ -119,7 +119,6 @@ function handleLs(
   const nodes = vfs.listDir(resolvedPath, showAll);
 
   if (nodes.length === 0) {
-    // Check if the path itself exists as a file
     const node = vfs.getNode(resolvedPath);
     if (node && node.type === "file") {
       if (showLong) {
@@ -169,12 +168,10 @@ function handleCd(
     };
   }
 
-  // Check if path exists (directory or root)
   if (resolvedPath === "/" || node) {
     return { output: "", newCwd: resolvedPath };
   }
 
-  // Also allow if it's a prefix of existing paths
   const exists = Array.from(vfs["nodes"].keys()).some(
     (p) => p.startsWith(resolvedPath + "/") || p === resolvedPath
   );
