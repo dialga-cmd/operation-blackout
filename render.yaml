@@ -1,0 +1,22 @@
+# Render Blueprint for Operation Blackout CTF
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: operation-blackout
+    env: node
+    region: oregon # or frankfurt, singapore, etc.
+    plan: free # or starter
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: ADMIN_EMAILS
+        sync: false

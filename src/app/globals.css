@@ -1,0 +1,156 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+@import "tailwindcss";
+
+:root {
+  --background: #0a0a0a;
+  --foreground: #00ff41;
+  --terminal-bg: #0d1117;
+  --terminal-border: #1a472a;
+  --glow: #00ff41;
+  --amber: #ffb000;
+  --red: #ff0040;
+  --cyan: #00d4ff;
+  --pixel-font: 'Press Start 2P', monospace;
+  --terminal-font: 'VT323', monospace;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-terminal-bg: var(--terminal-bg);
+  --color-terminal-border: var(--terminal-border);
+  --color-glow: var(--glow);
+  --color-amber: var(--amber);
+  --color-red: var(--red);
+  --color-cyan: var(--cyan);
+  --font-pixel: var(--pixel-font);
+  --font-terminal: var(--terminal-font);
+}
+
+* {
+  image-rendering: pixelated;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--terminal-font);
+  overflow-x: hidden;
+}
+
+/* CRT Scanline Effect (subtle) */
+.crt-overlay {
+  pointer-events: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 9999;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.1) 0px,
+    rgba(0, 0, 0, 0.1) 1px,
+    transparent 1px,
+    transparent 2px
+  );
+}
+
+/* Clean text without harsh glow */
+.crt-glow {
+  color: var(--foreground);
+}
+
+/* Terminal Cursor Blink */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.terminal-cursor {
+  animation: blink 1s step-end infinite;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* Pixel Art Shadow */
+.pixel-shadow {
+  box-shadow:
+    4px 4px 0px #000,
+    8px 8px 0px rgba(0, 0, 0, 0.3);
+}
+
+/* Pixel Border */
+.pixel-border {
+  border: 4px solid var(--terminal-border);
+}
+
+/* Pixel Button */
+.pixel-btn {
+  font-family: var(--pixel-font);
+  background: var(--terminal-border);
+  color: var(--foreground);
+  border: none;
+  padding: 12px 24px;
+  font-size: 12px;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.1s;
+  box-shadow: 4px 4px 0px #000;
+}
+
+.pixel-btn:hover {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0px #000;
+}
+
+.pixel-btn:active {
+  transform: translate(4px, 4px);
+  box-shadow: none;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0d1117;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1a472a;
+  border: 2px solid #0d1117;
+}
+
+/* Pixel Art Character Bounce */
+@keyframes bounce-pixel {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+.pixel-bounce {
+  animation: bounce-pixel 0.5s ease-in-out infinite;
+}
+
+/* Noise Background */
+.noise-bg {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+}
+
+/* Terminal Input */
+.terminal-input {
+  font-family: var(--terminal-font);
+  background: transparent;
+  border: none;
+  color: #00ff41;
+  outline: none;
+  font-size: 20px;
+  padding: 0;
+  margin: 0;
+  caret-color: transparent;
+}
+
+.terminal-input::selection {
+  background: rgba(0, 255, 65, 0.3);
+}
