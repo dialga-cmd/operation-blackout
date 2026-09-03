@@ -24,25 +24,15 @@ export default async function GamePage() {
     .eq("is_active", true)
     .order("number", { ascending: true });
 
-  // Determine current round
   let currentRound = 1;
-  if (progress && progress.length > 0) {
-    const completedRounds = progress
-      .filter((p) => p.status === "completed")
-      .map((p) => p.round_id);
+  const completedRounds = (progress || [])
+    .filter((p) => p.status === "completed")
+    .map((p) => p.round_id);
 
-    // Find the next available round
-    for (const round of rounds || []) {
-      if (!completedRounds.includes(round.number)) {
-        currentRound = round.number;
-        break;
-      }
-    }
-
-    // If all rounds completed
-    if (completedRounds.length === (rounds?.length || 3)) {
-      currentRound = 3; // Stay on last round
-    }
+  if (completedRounds.length > 0) {
+    const activeRoundNumbers = (rounds || []).map((r) => r.number).sort((a, b) => a - b);
+    const nextRound = activeRoundNumbers.find((n) => !completedRounds.includes(n));
+    currentRound = nextRound ?? activeRoundNumbers[activeRoundNumbers.length - 1] ?? 3;
   }
 
   // Check if round is unlocked

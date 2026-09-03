@@ -64,10 +64,17 @@ export function GameClient({
       setLoading(true);
       try {
         const res = await fetch(`/api/vfs/${round}?userId=${userId}`);
+        if (!res.ok) {
+          console.error(`VFS fetch failed: ${res.status}`);
+          setRoundData(null);
+          setLoading(false);
+          return;
+        }
         const data = await res.json();
         setRoundData(data);
       } catch (error) {
         console.error("Failed to load round data:", error);
+        setRoundData(null);
       }
       setLoading(false);
     },
