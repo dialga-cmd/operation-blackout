@@ -7,6 +7,22 @@ export const metadata: Metadata = {
   icons: {
     icon: "/favicon.webp",
   },
+  openGraph: {
+    title: "Operation Blackout",
+    description: "A high-security, retro-pixel themed Capture-The-Flag (CTF) competition. Operate an in-browser virtualized Linux terminal to investigate system breach incidents.",
+    url: "https://operation-blackout-xbjx.onrender.com",
+    siteName: "Operation Blackout",
+    images: [
+      {
+        url: "/favicon.webp",
+        width: 800,
+        height: 600,
+        alt: "Operation Blackout Logo",
+      },
+    ],
+    locale: "en_US",
+    type: "website",
+  },
 };
 
 export default function RootLayout({
