@@ -1,12 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useSearchParams } from "next/navigation";
 
 export function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const supabase = createClient();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (searchParams.get("error") === "unauthorized_domain") {
+      setError("ACCESS DENIED: Only .iitm.ac.in emails are allowed.");
+    }
+  }, [searchParams]);
 
   const handleGoogleLogin = async () => {
     setLoading(true);
