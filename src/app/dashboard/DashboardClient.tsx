@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PixelSoldier } from "@/components/pixel-art";
 
 interface DashboardProps {
@@ -61,6 +61,17 @@ interface DashboardProps {
   }>;
 }
 
+function formatTimestamp(value: string | null | undefined) {
+  if (!value) return "-";
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "-" : date.toISOString().replace("T", " ").replace(".000Z", " UTC");
+}
+
+function formatDate(value: string | null | undefined) {
+  return formatTimestamp(value).slice(0, 10);
+}
+
 export function DashboardClient({
   totalUsers,
   allUsers,
@@ -75,6 +86,11 @@ export function DashboardClient({
   const [rounds, setRounds] = useState(initialRoundsList);
   const [savingRound, setSavingRound] = useState<number | null>(null);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
+  const [currentTime, setCurrentTime] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCurrentTime(new Date().toLocaleString());
+  }, []);
 
   const handleUpdateRoundSchedule = async (roundNumber: number, unlockDate: string, isActive: boolean) => {
     setSavingRound(roundNumber);
@@ -120,7 +136,7 @@ export function DashboardClient({
           </div>
         </div>
         <div className="font-terminal text-sm text-[#666]">
-          {new Date().toLocaleString()}
+          {currentTime ?? "--"}
         </div>
       </div>
 
@@ -196,14 +212,14 @@ export function DashboardClient({
                 const roundInfo = rounds.find((r) => r.number === num) || {
                   number: num,
                   title: `Round ${num}`,
-                  unlock_date: new Date().toISOString(),
+                  unlock_date: "",
                   is_active: true,
                 };
 
                 // Convert ISO date to datetime-local input format YYYY-MM-DDTHH:mm
                 const formattedDateStr = roundInfo.unlock_date
-                  ? new Date(roundInfo.unlock_date).toISOString().slice(0, 16)
-                  : new Date().toISOString().slice(0, 16);
+                  ? formatTimestamp(roundInfo.unlock_date).slice(0, 16)
+                  : "";
 
                 return (
                   <div key={num} className="border border-[#1a472a] bg-[#0a0a0a] p-4 rounded">
@@ -256,6 +272,10 @@ export function DashboardClient({
                           const activeVal = (
                             document.getElementById(`is-active-${num}`) as HTMLInputElement
                           ).checked;
+                          if (!dateVal) {
+                            setSaveStatus(`Choose an unlock date for Round ${num}.`);
+                            return;
+                          }
                           const isoDate = new Date(dateVal).toISOString();
                           handleUpdateRoundSchedule(num, isoDate, activeVal);
                         }}
@@ -275,7 +295,7 @@ export function DashboardClient({
             <h2 className="font-pixel text-sm text-[#00ff41] mb-4 flex items-center justify-between">
               <span>REGISTERED USERS & ROLES</span>
               <span className="text-xs text-[#ffb000] font-terminal font-normal">
-                Admins checked from Supabase `admins` table & `users` role column
+                Admins checked from Supabase `admins` table & `ADMIN_EMAILS`
               </span>
             </h2>
             <div className="overflow-x-auto">
@@ -325,7 +345,7 @@ export function DashboardClient({
                             {userCompletedRounds} / 3 Rounds
                           </td>
                           <td className="py-2 text-[#666]">
-                            {u.created_at ? new Date(u.created_at).toLocaleDateString() : "-"}
+                            {formatDate(u.created_at)}
                           </td>
                         </tr>
                       );
@@ -353,8 +373,14 @@ export function DashboardClient({
                   </tr>
                 </thead>
                 <tbody>
-                  {allProgress.map((p, i) => (
-                    <tr key={i} className="border-b border-[#1a472a]/50">
+                  {allProgress.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-4 text-center text-[#666]">
+                        No progress records found.
+                      </td>
+                    </tr>
+                  ) : allProgress.map((p) => (
+                    <tr key={`${p.user_id}-${p.round_id}`} className="border-b border-[#1a472a]/50">
                       <td className="py-2 text-[#00ff41]">
                         {p.users?.email || p.user_id}
                       </td>
@@ -378,9 +404,7 @@ export function DashboardClient({
                         {p.score || "-"}
                       </td>
                       <td className="py-2 text-[#666]">
-                        {p.completed_at
-                          ? new Date(p.completed_at).toLocaleString()
-                          : "-"}
+                        {formatTimestamp(p.completed_at)}
                       </td>
                     </tr>
                   ))}
@@ -407,8 +431,14 @@ export function DashboardClient({
                   </tr>
                 </thead>
                 <tbody>
-                  {allAttempts.map((a, i) => (
-                    <tr key={i} className="border-b border-[#1a472a]/50">
+                  {allAttempts.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-4 text-center text-[#666]">
+                        No flag attempts found.
+                      </td>
+                    </tr>
+                  ) : allAttempts.map((a) => (
+                    <tr key={a.id} className="border-b border-[#1a472a]/50">
                       <td className="py-2 text-[#00ff41]">
                         {a.users?.email || "-"}
                       </td>
@@ -430,7 +460,7 @@ export function DashboardClient({
                         </span>
                       </td>
                       <td className="py-2 text-[#666]">
-                        {new Date(a.submitted_at).toLocaleString()}
+                        {formatTimestamp(a.submitted_at)}
                       </td>
                     </tr>
                   ))}
@@ -457,21 +487,25 @@ export function DashboardClient({
                       <th className="text-left py-2 text-[#666]">Submitter</th>
                       <th className="text-left py-2 text-[#666]">Flag Owner</th>
                       <th className="text-left py-2 text-[#666]">Round</th>
+                      <th className="text-left py-2 text-[#666]">Flag</th>
                       <th className="text-left py-2 text-[#666]">Status</th>
                       <th className="text-left py-2 text-[#666]">Detected</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {cheatAttempts.map((c, i) => (
-                      <tr key={i} className="border-b border-[#1a472a]/50">
+                    {cheatAttempts.map((c) => (
+                      <tr key={c.id} className="border-b border-[#1a472a]/50">
                         <td className="py-2 text-red-500">
-                          {c.submitter_id}
+                          {allUsers.find((user) => user.id === c.submitter_id)?.email || c.submitter_id}
                         </td>
                         <td className="py-2 text-[#ffb000]">
-                          {c.owner_id}
+                          {allUsers.find((user) => user.id === c.owner_id)?.email || c.owner_id}
                         </td>
                         <td className="py-2 text-[#666]">
                           Round {c.round_id}
+                        </td>
+                        <td className="py-2 text-[#666] font-mono text-xs max-w-xs truncate">
+                          {c.flag}
                         </td>
                         <td className="py-2">
                           <span className="px-2 py-1 text-xs bg-red-500/20 text-red-500">
@@ -479,7 +513,7 @@ export function DashboardClient({
                           </span>
                         </td>
                         <td className="py-2 text-[#666]">
-                          {new Date(c.detected_at).toLocaleString()}
+                          {formatTimestamp(c.detected_at)}
                         </td>
                       </tr>
                     ))}
@@ -501,9 +535,9 @@ export function DashboardClient({
               </div>
             ) : (
               <div className="space-y-4">
-                {timelineSubmissions.map((t, i) => (
+                {timelineSubmissions.map((t) => (
                   <div
-                    key={i}
+                    key={t.id}
                     className="border border-[#1a472a] p-4"
                   >
                     <div className="flex justify-between items-center mb-2">
@@ -511,7 +545,7 @@ export function DashboardClient({
                         {t.users?.email || "Unknown"}
                       </span>
                       <span className="font-terminal text-xs text-[#666]">
-                        {new Date(t.submitted_at).toLocaleString()}
+                        {formatTimestamp(t.submitted_at)}
                       </span>
                     </div>
                     <pre className="font-terminal text-sm text-[#ffb000] whitespace-pre-wrap">

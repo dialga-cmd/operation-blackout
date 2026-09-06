@@ -124,7 +124,7 @@ export async function POST(request: Request) {
       });
 
       if (sharedFlagUser) {
-        await supabase.from("cheat_attempts").insert([
+        const { error: cheatInsertError } = await supabase.from("cheat_attempts").insert([
           {
             submitter_id: userId,
             owner_id: sharedFlagUser.id,
@@ -140,6 +140,14 @@ export async function POST(request: Request) {
             status: "banned",
           },
         ]);
+
+        if (cheatInsertError) {
+          console.error("Cheat attempt insert error:", cheatInsertError);
+          return NextResponse.json(
+            { success: false, message: "Could not record the policy violation. Please try again." },
+            { status: 500 }
+          );
+        }
 
         await supabase
           .from("user_progress")

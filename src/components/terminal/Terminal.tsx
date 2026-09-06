@@ -55,7 +55,7 @@ export function Terminal({ roundData, roundId, userId, onFlagSubmit }: TerminalP
 
   const [vfs] = useState(() => new VFSEngine(roundData));
   const [isProcessing, setIsProcessing] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const outputRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = useCallback(() => {
@@ -102,7 +102,7 @@ export function Terminal({ roundData, roundId, userId, onFlagSubmit }: TerminalP
             id: entryId,
             prompt: currentPrompt,
             command: input,
-            output: "\x1b[1;33mUsage: timeline <your 4-6 line investigation summary>\x1b[0m",
+            output: "\x1b[1;33mUsage: timeline <4-6 line investigation summary; use Shift+Enter between lines>\x1b[0m",
           },
         ]);
         return;
@@ -215,8 +215,8 @@ export function Terminal({ roundData, roundId, userId, onFlagSubmit }: TerminalP
     setIsProcessing(false);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && !isProcessing) {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey && !isProcessing) {
       processCommand(currentInput);
       setCurrentInput("");
     } else if (e.key === "ArrowUp") {
@@ -319,7 +319,7 @@ export function Terminal({ roundData, roundId, userId, onFlagSubmit }: TerminalP
             <p>Linux operation-blackout 5.15.0 #1 SMP {new Date().toDateString()}</p>
             <p>Last login: {new Date().toLocaleString()}</p>
             <p>Type &apos;help&apos; for available commands.</p>
-            <p className="text-[#ffb000]">Use &apos;submit FLAG&lbrace;...&rbrace;&apos; to submit your flag.</p>
+            <p className="text-[#ffb000]">Use &apos;submit FLAG{'{'}...{'}'}&apos; to submit your flag.</p>
           </div>
         )}
 
@@ -343,18 +343,18 @@ export function Terminal({ roundData, roundId, userId, onFlagSubmit }: TerminalP
             {getPrompt()}
           </span>
           <div className="relative flex-1 flex items-center min-w-[200px]">
-            <input
+            <textarea
               ref={inputRef}
-              type="text"
               value={currentInput}
               onChange={(e) => setCurrentInput(e.target.value)}
               onKeyDown={handleKeyDown}
               onBlur={() => setTimeout(() => inputRef.current?.focus(), 10)}
-              className="terminal-input w-full"
+              className="terminal-input w-full resize-none"
               disabled={isProcessing}
               autoFocus
               spellCheck={false}
               autoComplete="off"
+              rows={1}
             />
           </div>
         </div>

@@ -4,10 +4,22 @@ import { createClient } from "@/lib/supabase/server";
 export async function POST(request: Request) {
   try {
     const { roundId, userId, content } = await request.json();
+    const normalizedRoundId = Number(roundId);
+    const timelineContent = typeof content === "string"
+      ? content.replace(/\\n/g, "\n").trim()
+      : "";
+    const lineCount = timelineContent ? timelineContent.split(/\r?\n/).length : 0;
 
-    if (!roundId || !userId || !content) {
+    if (!normalizedRoundId || !userId || !timelineContent) {
       return NextResponse.json(
         { success: false, message: "Missing required fields." },
+        { status: 400 }
+      );
+    }
+
+    if (normalizedRoundId !== 3 || lineCount < 4 || lineCount > 6) {
+      return NextResponse.json(
+        { success: false, message: "Timeline reports must be 4-6 lines and submitted for Round 3." },
         { status: 400 }
       );
     }
@@ -24,8 +36,8 @@ export async function POST(request: Request) {
 
     const { error } = await supabase.from("timeline_submissions").insert({
       user_id: userId,
-      round_id: roundId,
-      content,
+      round_id: normalizedRoundId,
+      content: timelineContent,
     });
 
     if (error) {

@@ -12,10 +12,12 @@ export default async function DashboardPage() {
     redirect("/");
   }
 
-  // Admin check logic:
-  // 1. First check the `admins` table on Supabase (by user_id or email)
-  // 2. Fallback to `users` table `role = 'admin'`
-  // 3. Fallback to ADMIN_EMAILS env variable if table doesn't exist yet
+  const adminEmails = (process.env.ADMIN_EMAILS || "")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+
+  // Check the admins table first, then the explicit environment allowlist.
   let isAdmin = false;
 
   try {
@@ -27,27 +29,13 @@ export default async function DashboardPage() {
 
     if (adminRecord) {
       isAdmin = true;
-    } else {
-      const { data: userRoleRecord } = await adminSupabase
-        .from("users")
-        .select("role")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (userRoleRecord?.role === "admin") {
-        isAdmin = true;
-      }
     }
   } catch {
-    // If admins table is not yet migrated, check ADMIN_EMAILS env
+    // If admins table is not migrated, use the environment allowlist.
   }
 
-  if (!isAdmin) {
-    const adminEmails = (process.env.ADMIN_EMAILS || "")
-      .split(",")
-      .map((e) => e.trim().toLowerCase())
-      .filter(Boolean);
-    isAdmin = adminEmails.length === 0 || (user.email ? adminEmails.includes(user.email.toLowerCase()) : false);
+  if (!isAdmin && user.email) {
+    isAdmin = adminEmails.includes(user.email.toLowerCase());
   }
 
   if (!isAdmin) {
@@ -55,9 +43,12 @@ export default async function DashboardPage() {
   }
 
   // Fetch all registered users with roles (Admin / Participant)
-  const { data: allUsers } = await adminSupabase
+  const { data: allUsers, error: usersError } = await adminSupabase
     .from("users")
-    .select("id, email, name, role, created_at");
+    .select("id, email, name, created_at");
+  if (usersError) {
+    console.error("Failed to fetch dashboard users:", usersError);
+  }
 
   // Fetch admins list from admins table if present
   const { data: adminTableList } = await adminSupabase
@@ -71,7 +62,8 @@ export default async function DashboardPage() {
   });
 
   const formattedUsers = (allUsers || []).map((u) => {
-    const userRole = u.role === "admin" || adminSet.has(u.id) || (u.email && adminSet.has(u.email.toLowerCase()))
+    const userRole = adminSet.has(u.id) ||
+      (u.email && (adminSet.has(u.email.toLowerCase()) || adminEmails.includes(u.email.toLowerCase())))
       ? "admin"
       : "participant";
     return {
@@ -81,7 +73,7 @@ export default async function DashboardPage() {
   });
 
   // Get all user progress
-  const { data: allProgress } = await adminSupabase
+  const { data: allProgress, error: progressError } = await adminSupabase
     .from("user_progress")
     .select(`
       *,
@@ -89,9 +81,33 @@ export default async function DashboardPage() {
       rounds:round_id (number, title)
     `)
     .order("round_id", { ascending: true });
+  if (progressError) {
+    console.error("Failed to fetch dashboard progress:", progressError);
+  }
+
+  const formattedProgress = (allProgress || []).map((progress) => ({
+    user_id: progress.user_id,
+    round_id: progress.round_id,
+    status: progress.status,
+    score: progress.score,
+    started_at: progress.started_at,
+    completed_at: progress.completed_at,
+    users: progress.users
+      ? {
+          email: progress.users.email || "",
+          name: progress.users.name || "",
+        }
+      : undefined,
+    rounds: progress.rounds
+      ? {
+          number: progress.rounds.number,
+          title: progress.rounds.title || "",
+        }
+      : undefined,
+  }));
 
   // Get all flag attempts
-  const { data: allAttempts } = await adminSupabase
+  const { data: allAttempts, error: attemptsError } = await adminSupabase
     .from("flag_attempts")
     .select(`
       *,
@@ -99,27 +115,63 @@ export default async function DashboardPage() {
     `)
     .order("submitted_at", { ascending: false })
     .limit(100);
+  if (attemptsError) {
+    console.error("Failed to fetch dashboard flag attempts:", attemptsError);
+  }
+
+  const formattedAttempts = (allAttempts || []).map((attempt) => ({
+    id: attempt.id,
+    flag: attempt.flag,
+    correct: attempt.correct,
+    submitted_at: attempt.submitted_at,
+    round_id: attempt.round_id,
+    users: attempt.users
+      ? {
+          email: attempt.users.email || "",
+          name: attempt.users.name || "",
+        }
+      : undefined,
+  }));
 
   // Get cheat attempts
-  const { data: cheatAttempts } = await adminSupabase
+  const { data: cheatAttempts, error: cheatAttemptsError } = await adminSupabase
     .from("cheat_attempts")
     .select("*")
     .order("detected_at", { ascending: false });
+  if (cheatAttemptsError) {
+    console.error("Failed to fetch dashboard cheat attempts:", cheatAttemptsError);
+  }
 
   // Get timeline submissions
-  const { data: timelineSubmissions } = await adminSupabase
+  const { data: timelineSubmissions, error: timelineError } = await adminSupabase
     .from("timeline_submissions")
     .select(`
       *,
       users:user_id (email, name)
     `)
     .order("submitted_at", { ascending: false });
+  if (timelineError) {
+    console.error("Failed to fetch dashboard timeline submissions:", timelineError);
+  }
+
+  const formattedTimelineSubmissions = (timelineSubmissions || []).map((submission) => ({
+    id: submission.id,
+    content: submission.content,
+    submitted_at: submission.submitted_at,
+    round_id: submission.round_id,
+    users: submission.users
+      ? {
+          email: submission.users.email || "",
+          name: submission.users.name || "",
+        }
+      : undefined,
+  }));
 
   // Stats calculation
   const totalUsers = formattedUsers.length;
 
   const roundStats = [1, 2, 3].map((round) => {
-    const roundProgress = allProgress?.filter(
+    const roundProgress = formattedProgress.filter(
       (p) => p.round_id === round
     ) || [];
     const completed = roundProgress.filter(
@@ -139,10 +191,13 @@ export default async function DashboardPage() {
   });
 
   // Fetch rounds config for schedule controls
-  const { data: roundsList } = await adminSupabase
+  const { data: roundsList, error: roundsError } = await adminSupabase
     .from("rounds")
     .select("*")
     .order("number", { ascending: true });
+  if (roundsError) {
+    console.error("Failed to fetch dashboard rounds:", roundsError);
+  }
 
   return (
     <DashboardClient
@@ -150,10 +205,10 @@ export default async function DashboardPage() {
       allUsers={formattedUsers}
       roundsList={roundsList || []}
       roundStats={roundStats}
-      allProgress={allProgress || []}
-      allAttempts={allAttempts || []}
+      allProgress={formattedProgress}
+      allAttempts={formattedAttempts}
       cheatAttempts={cheatAttempts || []}
-      timelineSubmissions={timelineSubmissions || []}
+      timelineSubmissions={formattedTimelineSubmissions}
     />
   );
 }

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://operation-blackout-xbjx.onrender.com"),
   title: "Operation Blackout",
   description: "A simulated Linux CTF investigation — Investigate the breach.",
   icons: {
