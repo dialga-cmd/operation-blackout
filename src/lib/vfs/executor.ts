@@ -3,6 +3,18 @@ import { parseInput } from "./parser";
 import { executeCommand } from "./commands";
 import { SessionState, CommandResult } from "../types";
 
+const ROUND3_FLAG_PREFIX = "FLAG{the_trace_that_remained_";
+
+function getRound3StashDir(vfs: VFSEngine): string | null {
+  const round = vfs.getRound();
+  const flagFile = (round.nodes || []).find(
+    (n) => n.type === "file" && n.content && n.content.startsWith(ROUND3_FLAG_PREFIX)
+  );
+  if (!flagFile) return null;
+  const idx = flagFile.path.lastIndexOf("/");
+  return idx > 0 ? flagFile.path.substring(0, idx) : null;
+}
+
 export function executePipeline(
   input: string,
   vfs: VFSEngine,
@@ -43,7 +55,8 @@ export function executePipeline(
         continue;
       }
 
-      if (cmd.args.length < 2) {
+      const sudoArgs = cmd.args.filter((a) => a !== "-S");
+      if (sudoArgs.length < 2) {
         lastResult = {
           output: "sudo: a password is required",
           error: true,
@@ -52,16 +65,20 @@ export function executePipeline(
         continue;
       }
 
-      const subCmd = cmd.args[0];
-      const subArgs = cmd.args.slice(1);
+      const subCmd = sudoArgs[0];
+      const subArgs = sudoArgs.slice(1);
       const elevatedUser = "svc-unknown";
 
       const targetPath = subArgs.find((a) => !a.startsWith("-")) || "";
       const round = parseInt(newSession.env.ROUND || "1", 10);
+      const stashDir = getRound3StashDir(vfs);
+      const passwordSupplied = pipedInput.trim() === "password";
       const permitted =
-        round === 3 &&
-        subCmd === "cat" &&
-        targetPath.startsWith("/var/log/.final_stash/");
+        passwordSupplied ||
+        (round === 3 &&
+         subCmd === "cat" &&
+         !!stashDir &&
+         targetPath.startsWith(`${stashDir}/`));
 
       if (!permitted) {
         lastResult = {
@@ -81,7 +98,7 @@ export function executePipeline(
         newSession.env,
         newSession.scratchSpace,
         elevatedUser,
-        pipedInput
+        passwordSupplied ? "" : pipedInput
       );
       currentInput = lastResult.output;
       continue;

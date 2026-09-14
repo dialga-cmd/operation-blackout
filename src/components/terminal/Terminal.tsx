@@ -59,25 +59,23 @@ export function Terminal({ roundData, roundId, userId, onFlagSubmit }: TerminalP
   const outputRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = useCallback(() => {
-    if (outputRef.current) {
-      outputRef.current.scrollTop = outputRef.current.scrollHeight;
-    }
+    requestAnimationFrame(() => {
+      if (outputRef.current) {
+        outputRef.current.scrollTop = outputRef.current.scrollHeight;
+      }
+    });
   }, []);
 
   useEffect(() => {
     scrollToBottom();
-  }, [terminalHistory, scrollToBottom]);
+  }, [terminalHistory, currentInput, isProcessing, scrollToBottom]);
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
   const getPrompt = () => {
-    const dir = session.cwd === "/home/participant" ? "~" :
-      session.cwd.startsWith("/home/participant/") ?
-        "~" + session.cwd.slice("/home/participant".length) :
-        session.cwd;
-    return `root@blackout:${dir}# `;
+    return `root@blackout:${session.cwd}# `;
   };
 
   const processCommand = async (input: string) => {
@@ -240,7 +238,12 @@ export function Terminal({ roundData, roundId, userId, onFlagSubmit }: TerminalP
     } else if (e.key === "l" && e.ctrlKey) {
       e.preventDefault();
       setTerminalHistory([]);
-    } else if (e.key === "c" && e.ctrlKey) {
+    } else if (e.key === "c" && e.ctrlKey && !e.shiftKey) {
+      const selected = window.getSelection()?.toString() ?? "";
+      const inputSelected =
+        inputRef.current &&
+        inputRef.current.selectionStart !== inputRef.current.selectionEnd;
+      if (selected.length > 0 || inputSelected) return;
       e.preventDefault();
       const currentPrompt = getPrompt();
       setTerminalHistory((prev) => [
@@ -257,12 +260,15 @@ export function Terminal({ roundData, roundId, userId, onFlagSubmit }: TerminalP
   };
 
   const handleTerminalClick = () => {
+    if ((window.getSelection()?.toString() ?? "").length > 0) return;
     inputRef.current?.focus();
   };
 
-  // Keep terminal input focused continuously (real terminal behavior)
+  // Keep terminal input focused when the window regains focus (real terminal behavior),
+  // but never steal focus while the user is selecting text to copy.
   useEffect(() => {
     const keepFocus = () => {
+      if ((window.getSelection()?.toString() ?? "").length > 0) return;
       if (document.activeElement !== inputRef.current) {
         inputRef.current?.focus();
       }
@@ -270,11 +276,9 @@ export function Terminal({ roundData, roundId, userId, onFlagSubmit }: TerminalP
 
     keepFocus();
     window.addEventListener("focus", keepFocus);
-    window.addEventListener("keydown", keepFocus);
 
     return () => {
       window.removeEventListener("focus", keepFocus);
-      window.removeEventListener("keydown", keepFocus);
     };
   }, []);
 
@@ -311,7 +315,7 @@ export function Terminal({ roundData, roundId, userId, onFlagSubmit }: TerminalP
       <div
         ref={outputRef}
         onClick={handleTerminalClick}
-        className="flex-1 overflow-y-auto p-4 font-terminal text-[20px] leading-relaxed text-[#00ff41] bg-[#0d1117] cursor-text"
+        className="flex-1 overflow-y-auto p-4 font-terminal text-[22px] leading-relaxed text-[#00ff41] bg-[#0d1117] cursor-text select-text selection:bg-[#00ff41]/30"
       >
         {/* Welcome message */}
         {terminalHistory.length === 0 && (
@@ -330,7 +334,7 @@ export function Terminal({ roundData, roundId, userId, onFlagSubmit }: TerminalP
               {item.prompt}{item.command}
             </div>
             {item.output ? (
-              <pre className="whitespace-pre-wrap text-[#00ff41]/90 font-terminal text-[20px] leading-normal my-1">
+              <pre className="whitespace-pre-wrap break-all text-[#00ff41]/90 font-terminal text-[22px] leading-normal my-1 select-text selection:bg-[#00ff41]/30">
                 {item.output}
               </pre>
             ) : null}
@@ -348,7 +352,10 @@ export function Terminal({ roundData, roundId, userId, onFlagSubmit }: TerminalP
               value={currentInput}
               onChange={(e) => setCurrentInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              onBlur={() => setTimeout(() => inputRef.current?.focus(), 10)}
+              onBlur={() => {
+                if ((window.getSelection()?.toString() ?? "").length > 0) return;
+                setTimeout(() => inputRef.current?.focus(), 10);
+              }}
               className="terminal-input w-full resize-none"
               disabled={isProcessing}
               autoFocus

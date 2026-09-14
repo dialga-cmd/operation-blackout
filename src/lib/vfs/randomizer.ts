@@ -207,6 +207,12 @@ echo "DECOY_WARNING: Avoid false triggers in /var/log/.correlated"`,
           ...node,
           path: `${targetDir}/${part3Name}`,
           content: `ain_permissions}`,
+          permissions: "-rw-r-----",
+          owner: "svc-unknown",
+          group: "backup",
+          mtime: "2026-01-14T02:19:45Z",
+          size: 18,
+          inode: 2001013,
         });
         nodes.push({
           path: `${targetDir}/${decoy1Name}`,

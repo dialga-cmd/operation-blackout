@@ -1,6 +1,19 @@
 import { CommandResult } from "../../types";
 import { VFSEngine } from "../engine";
 
+const ROUND3_FLAG_PREFIX = "FLAG{the_trace_that_remained_";
+
+function findRound3Stash(vfs: VFSEngine): string {
+  const flagFile = (vfs.getRound().nodes || []).find(
+    (n) => n.type === "file" && n.content && n.content.startsWith(ROUND3_FLAG_PREFIX)
+  );
+  if (flagFile) {
+    const idx = flagFile.path.lastIndexOf("/");
+    if (idx > 0) return flagFile.path.substring(0, idx);
+  }
+  return "/var/log/.final_stash";
+}
+
 export function executeCommand(
   cmd: string,
   args: string[],
@@ -72,7 +85,7 @@ export function executeCommand(
     case "join":
       return handleJoin(args, stdin);
     case "sudo":
-      return handleSudo(args, cwd, env);
+      return handleSudo(args, vfs, cwd, env);
     case "clear":
       return { output: "", clear: true };
     case "help":
@@ -799,6 +812,7 @@ function parseRanges(input: string): number[] {
 
 function handleSudo(
   args: string[],
+  vfs: VFSEngine,
   cwd: string,
   env: Record<string, string>
 ): CommandResult {
@@ -828,7 +842,7 @@ function handleSudo(
           "",
           "User participant may run the following commands on this host:",
           "    (root) NOPASSWD: /usr/bin/less /var/log/*",
-          "    (svc-unknown) NOPASSWD: /bin/cat /var/log/.final_stash/*",
+          `    (svc-unknown) NOPASSWD: /bin/cat ${findRound3Stash(vfs)}/*`,
         ].join("\n"),
       };
     }
