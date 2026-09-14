@@ -3,6 +3,8 @@ import { generateFlagKey, getTodayDate } from "@/lib/crypto/flag-key";
 import { roundVFSMap } from "@/data/rounds";
 import { randomizeRoundVFS } from "@/lib/vfs/randomizer";
 import { createClient } from "@/lib/supabase/server";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { getCachedVFS, setCachedVFS } from "@/lib/vfs-cache";
 
 export async function GET(
   request: Request,
@@ -17,8 +19,18 @@ export async function GET(
     return NextResponse.json({ error: "Missing userId" }, { status: 400 });
   }
 
+  const rl = checkRateLimit(`vfs:${userId}`, RATE_LIMITS.vfsFetch);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: `Rate limit exceeded. Retry in ${Math.ceil(rl.retryAfterMs / 1000)}s.` },
+      { status: 429 }
+    );
+  }
+
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user || user.id !== userId) {
     return NextResponse.json({ error: "Unauthorized access" }, { status: 403 });
@@ -43,9 +55,16 @@ export async function GET(
   }
 
   const todayDate = getTodayDate();
-  const flagKey = generateFlagKey(userId, roundId, todayDate);
 
+  const cached = getCachedVFS(userId, roundId, todayDate);
+  if (cached) {
+    return NextResponse.json(cached);
+  }
+
+  const flagKey = generateFlagKey(userId, roundId, todayDate);
   const personalizedRound = randomizeRoundVFS(roundData, userId, flagKey);
+
+  setCachedVFS(userId, roundId, todayDate, personalizedRound);
 
   return NextResponse.json(personalizedRound);
 }

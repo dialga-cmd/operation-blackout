@@ -3,10 +3,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getTodayDate } from "@/lib/crypto/flag-key";
 import { buildExpectedFlag, DECOY_FLAGS } from "@/lib/server/flag-answer";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
   try {
-    const admin = createAdminClient();
     const { flag, roundId, userId } = await request.json();
 
     if (!flag || !roundId || !userId) {
@@ -16,8 +16,21 @@ export async function POST(request: Request) {
       );
     }
 
+    const rl = checkRateLimit(`flag:${userId}`, RATE_LIMITS.flagValidate);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: `Rate limit exceeded. Try again in ${Math.ceil(rl.retryAfterMs / 1000)}s.`,
+        },
+        { status: 429 }
+      );
+    }
+
     const authClient = await createClient();
-    const { data: { user: sessionUser } } = await authClient.auth.getUser();
+    const {
+      data: { user: sessionUser },
+    } = await authClient.auth.getUser();
 
     if (!sessionUser || sessionUser.id !== userId) {
       return NextResponse.json(
@@ -26,16 +39,25 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = admin;
+    const supabase = createAdminClient();
 
-    const { data: banCheck } = await supabase
-      .from("cheat_attempts")
-      .select("status")
-      .eq("submitter_id", userId)
-      .eq("status", "banned")
-      .single();
+    const [banCheck, recentAttempts] = await Promise.all([
+      supabase
+        .from("cheat_attempts")
+        .select("status")
+        .eq("submitter_id", userId)
+        .eq("status", "banned")
+        .single(),
+      supabase
+        .from("flag_attempts")
+        .select("submitted_at, correct")
+        .eq("user_id", userId)
+        .eq("round_id", roundId)
+        .order("submitted_at", { ascending: false })
+        .limit(20),
+    ]);
 
-    if (banCheck) {
+    if (banCheck.data) {
       return NextResponse.json(
         {
           success: false,
@@ -46,30 +68,21 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data: recentAttempts } = await supabase
-      .from("flag_attempts")
-      .select("submitted_at, correct")
-      .eq("user_id", userId)
-      .eq("round_id", roundId)
-      .order("submitted_at", { ascending: false })
-      .limit(20);
-
     const now = Date.now();
-    if (recentAttempts && recentAttempts.length > 0) {
-      const lastAttempt = new Date(
-        recentAttempts[0].submitted_at
-      ).getTime();
+    const attempts = recentAttempts.data;
+    if (attempts && attempts.length > 0) {
+      const lastAttempt = new Date(attempts[0].submitted_at).getTime();
       const cooldownMs = 30 * 1000;
       const elapsed = now - lastAttempt;
-      if (elapsed < cooldownMs && !recentAttempts[0].correct) {
+      if (elapsed < cooldownMs && !attempts[0].correct) {
         const waitSeconds = Math.ceil((cooldownMs - elapsed) / 1000);
         return NextResponse.json({
           success: false,
           message: `Too many attempts. Please wait ${waitSeconds}s before trying again.`,
         });
       }
-      if (recentAttempts.length >= 20) {
-        const allWrong = recentAttempts.every((a) => !a.correct);
+      if (attempts.length >= 20) {
+        const allWrong = attempts.every((a) => !a.correct);
         if (allWrong && now - lastAttempt < 10 * 60 * 1000) {
           return NextResponse.json({
             success: false,
@@ -112,28 +125,35 @@ export async function POST(request: Request) {
         correct: false,
       });
 
-      const { data: allParticipants } = await supabase
-        .from("users")
-        .select("id");
+      const { data: completedUsers } = await supabase
+        .from("user_progress")
+        .select("user_id")
+        .eq("round_id", roundId)
+        .eq("status", "completed");
 
-      const sharedFlagUser = (allParticipants || []).find((u) => {
-        if (u.id === userId) return false;
-        return (
-          buildExpectedFlag(roundId, u.id, todayDate) === flag
-        );
-      });
+      const candidates = (completedUsers || []).filter(
+        (u) => u.user_id !== userId
+      );
+
+      let sharedFlagUser: { user_id: string } | null = null;
+      for (const c of candidates) {
+        if (buildExpectedFlag(roundId, c.user_id, todayDate) === flag) {
+          sharedFlagUser = c;
+          break;
+        }
+      }
 
       if (sharedFlagUser) {
-        const { error: cheatInsertError } = await supabase.from("cheat_attempts").insert([
+        await supabase.from("cheat_attempts").insert([
           {
             submitter_id: userId,
-            owner_id: sharedFlagUser.id,
+            owner_id: sharedFlagUser.user_id,
             flag,
             round_id: roundId,
             status: "banned",
           },
           {
-            submitter_id: sharedFlagUser.id,
+            submitter_id: sharedFlagUser.user_id,
             owner_id: userId,
             flag: "(flag sharing detected)",
             round_id: roundId,
@@ -141,25 +161,18 @@ export async function POST(request: Request) {
           },
         ]);
 
-        if (cheatInsertError) {
-          console.error("Cheat attempt insert error:", cheatInsertError);
-          return NextResponse.json(
-            { success: false, message: "Could not record the policy violation. Please try again." },
-            { status: 500 }
-          );
-        }
-
-        await supabase
-          .from("user_progress")
-          .update({ status: "locked" })
-          .eq("user_id", userId)
-          .eq("round_id", roundId);
-
-        await supabase
-          .from("user_progress")
-          .update({ status: "locked" })
-          .eq("user_id", sharedFlagUser.id)
-          .eq("round_id", roundId);
+        await Promise.all([
+          supabase
+            .from("user_progress")
+            .update({ status: "locked" })
+            .eq("user_id", userId)
+            .eq("round_id", roundId),
+          supabase
+            .from("user_progress")
+            .update({ status: "locked" })
+            .eq("user_id", sharedFlagUser.user_id)
+            .eq("round_id", roundId),
+        ]);
 
         return NextResponse.json({
           success: false,
@@ -170,7 +183,8 @@ export async function POST(request: Request) {
 
       return NextResponse.json({
         success: false,
-        message: "INCORRECT: That flag is not valid for your session. Keep investigating.",
+        message:
+          "INCORRECT: That flag is not valid for your session. Keep investigating.",
       });
     }
 

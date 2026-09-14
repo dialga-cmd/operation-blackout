@@ -1,11 +1,25 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
   try {
+    const rl = checkRateLimit("admin:rounds", {
+      windowMs: 60_000,
+      maxRequests: 30,
+    });
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded" },
+        { status: 429 }
+      );
+    }
+
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -29,17 +43,27 @@ export async function POST(request: Request) {
         .split(",")
         .map((e) => e.trim().toLowerCase())
         .filter(Boolean);
-      isAdmin = adminEmails.length === 0 || (user.email ? adminEmails.includes(user.email.toLowerCase()) : false);
+      isAdmin =
+        adminEmails.length === 0 ||
+        (user.email
+          ? adminEmails.includes(user.email.toLowerCase())
+          : false);
     }
 
     if (!isAdmin) {
-      return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 });
+      return NextResponse.json(
+        { error: "Forbidden: Admin access required" },
+        { status: 403 }
+      );
     }
 
     const { roundNumber, unlockDate, isActive } = await request.json();
 
     if (!roundNumber) {
-      return NextResponse.json({ error: "Missing roundNumber" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Missing roundNumber" },
+        { status: 400 }
+      );
     }
 
     const { data, error } = await adminSupabase
@@ -54,12 +78,18 @@ export async function POST(request: Request) {
 
     if (error) {
       console.error("Failed to update round schedule:", error);
-      return NextResponse.json({ error: "Database update failed" }, { status: 500 });
+      return NextResponse.json(
+        { error: "Database update failed" },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({ success: true, round: data });
   } catch (err) {
     console.error("Admin round update error:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }
