@@ -379,35 +379,64 @@ export function DashboardClient({
                         No progress records found.
                       </td>
                     </tr>
-                  ) : allProgress.map((p) => (
-                    <tr key={`${p.user_id}-${p.round_id}`} className="border-b border-[#1a472a]/50">
-                      <td className="py-2 text-[#00ff41]">
-                        {p.users?.email || p.user_id}
-                      </td>
-                      <td className="py-2 text-[#ffb000]">
-                        Round {p.round_id}
-                      </td>
-                      <td className="py-2">
-                        <span
-                          className={`px-2 py-1 text-xs ${
-                            p.status === "completed"
-                              ? "bg-[#00ff41]/20 text-[#00ff41]"
-                              : p.status === "in_progress"
-                                ? "bg-[#ffb000]/20 text-[#ffb000]"
-                                : "bg-[#666]/20 text-[#666]"
-                          }`}
-                        >
-                          {p.status}
-                        </span>
-                      </td>
-                      <td className="py-2 text-[#00ff41]">
-                        {p.score || "-"}
-                      </td>
-                      <td className="py-2 text-[#666]">
-                        {formatTimestamp(p.completed_at)}
-                      </td>
-                    </tr>
-                  ))}
+                  ) : (() => {
+                    const statusWeight: Record<string, number> = {
+                      "completed": 3,
+                      "in_progress": 2,
+                      "available": 1
+                    };
+                    const uniqueProgress = Object.values(
+                      allProgress.reduce((acc, p) => {
+                        const current = acc[p.user_id];
+                        if (!current) {
+                          acc[p.user_id] = p;
+                          return acc;
+                        }
+                        
+                        const currentWeight = statusWeight[current.status] || 0;
+                        const pWeight = statusWeight[p.status] || 0;
+                        
+                        if (pWeight > currentWeight) {
+                          acc[p.user_id] = p;
+                        } else if (pWeight === currentWeight) {
+                          if (p.round_id > current.round_id) {
+                            acc[p.user_id] = p;
+                          }
+                        }
+                        return acc;
+                      }, {} as Record<string, typeof allProgress[0]>)
+                    );
+                    
+                    return uniqueProgress.map((p) => (
+                      <tr key={`${p.user_id}-${p.round_id}`} className="border-b border-[#1a472a]/50">
+                        <td className="py-2 text-[#00ff41]">
+                          {p.users?.email || p.user_id}
+                        </td>
+                        <td className="py-2 text-[#ffb000]">
+                          Round {p.round_id}
+                        </td>
+                        <td className="py-2">
+                          <span
+                            className={`px-2 py-1 text-xs ${
+                              p.status === "completed"
+                                ? "bg-[#00ff41]/20 text-[#00ff41]"
+                                : p.status === "in_progress"
+                                  ? "bg-[#ffb000]/20 text-[#ffb000]"
+                                  : "bg-[#666]/20 text-[#666]"
+                            }`}
+                          >
+                            {p.status}
+                          </span>
+                        </td>
+                        <td className="py-2 text-[#00ff41]">
+                          {p.score || "-"}
+                        </td>
+                        <td className="py-2 text-[#666]">
+                          {formatTimestamp(p.completed_at)}
+                        </td>
+                      </tr>
+                    ));
+                  })()}
                 </tbody>
               </table>
             </div>

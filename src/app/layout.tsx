@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import SecurityLayer from "@/components/SecurityLayer";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://operation-blackout-xbjx.onrender.com"),
@@ -32,6 +33,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full">
       <body className="min-h-full flex flex-col bg-[#0a0a0a]">
+        <SecurityLayer />
         <div className="crt-overlay" />
         {children}
       </body>

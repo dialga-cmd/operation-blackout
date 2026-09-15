@@ -6,6 +6,7 @@ import { PixelSoldier, PixelProgressSprite } from "@/components/pixel-art";
 import { UserProgress, Round, VFSRound } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 interface GameClientProps {
   userId: string;
@@ -158,9 +159,9 @@ export function GameClient({
       {/* Top Bar */}
       <div className="flex items-center justify-between px-4 py-3 bg-[#0d1117] border-b border-[#1a472a]">
         <div className="flex items-center gap-4">
-          <h1 className="font-pixel text-sm text-[#00ff41]">
+          <Link href="/game" className="font-pixel text-sm text-[#00ff41] hover:text-[#ffb000] transition-colors cursor-pointer">
             OPERATION BLACKOUT
-          </h1>
+          </Link>
           <div className="h-4 w-px bg-[#1a472a]" />
           <span className="font-terminal text-sm text-[#ffb000]">
             Round {currentRound}

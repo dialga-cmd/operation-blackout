@@ -1,8 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { GameClient } from "./GameClient";
+import { DaySelectionClient } from "./DaySelectionClient";
 
-export default async function GamePage() {
+export default async function GamePage({ searchParams }: { searchParams: Promise<{ day?: string }> }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -21,34 +22,48 @@ export default async function GamePage() {
   const { data: rounds } = await supabase
     .from("rounds")
     .select("*")
-    .eq("is_active", true)
     .order("number", { ascending: true });
 
-  let currentRound = 1;
+  const params = await searchParams;
+  const dayParam = params?.day;
+
+  if (!dayParam) {
+    return <DaySelectionClient progress={progress || []} rounds={rounds || []} />;
+  }
+
+  let currentRound = parseInt(dayParam, 10);
+  
+  if (![1, 2, 3].includes(currentRound)) {
+    redirect("/game");
+  }
+  
   const completedRounds = (progress || [])
     .filter((p) => p.status === "completed")
     .map((p) => p.round_id);
 
-  if (completedRounds.length > 0) {
-    const activeRoundNumbers = (rounds || []).map((r) => r.number).sort((a, b) => a - b);
-    const nextRound = activeRoundNumbers.find((n) => !completedRounds.includes(n));
-    currentRound = nextRound ?? activeRoundNumbers[activeRoundNumbers.length - 1] ?? 3;
+  const isCompleted = completedRounds.includes(currentRound);
+  const isPrevCompleted = currentRound === 1 || completedRounds.includes(currentRound - 1);
+  const roundData = rounds?.find(r => r.number === currentRound);
+  // eslint-disable-next-line react-hooks/purity
+  const isUnlockedTime = roundData?.is_active && new Date(roundData.unlock_date).getTime() <= Date.now();
+
+  if (!isCompleted && (!isPrevCompleted || !isUnlockedTime)) {
+    redirect("/game");
   }
 
-  // Check if round is unlocked
   let nextRoundUnlockDate: string | null = null;
   const currentRoundData = rounds?.find((r) => r.number === currentRound);
   if (currentRoundData) {
     const unlockDate = new Date(currentRoundData.unlock_date);
     if (unlockDate > new Date() || currentRoundData.is_active === false) {
-      // Round not yet unlocked
-      nextRoundUnlockDate = currentRoundData.unlock_date;
-      currentRound = 0;
+      if (!isCompleted) {
+        nextRoundUnlockDate = currentRoundData.unlock_date;
+        currentRound = 0;
+      }
     }
   }
 
-  // Mark round as in_progress if not completed
-  if (currentRound > 0) {
+  if (currentRound > 0 && !isCompleted) {
     const existingProgress = progress?.find(
       (p) => p.round_id === currentRound
     );

@@ -36,6 +36,9 @@ body {
   color: var(--foreground);
   font-family: var(--terminal-font);
   overflow-x: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
 }
 
 /* CRT Scanline Effect (subtle) */
