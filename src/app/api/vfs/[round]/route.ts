@@ -36,6 +36,20 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized access" }, { status: 403 });
   }
 
+  const { data: banCheck } = await supabase
+    .from("cheat_attempts")
+    .select("status")
+    .eq("submitter_id", userId)
+    .eq("status", "banned")
+    .maybeSingle();
+
+  if (banCheck) {
+    return NextResponse.json(
+      { error: "BANNED: Your account has been suspended for policy violation." },
+      { status: 403 }
+    );
+  }
+
   if (roundId > 1) {
     const { data: prevProgress } = await supabase
       .from("user_progress")

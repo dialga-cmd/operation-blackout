@@ -199,6 +199,43 @@ export default async function DashboardPage() {
     console.error("Failed to fetch dashboard rounds:", roundsError);
   }
 
+  // Fetch correct flag submissions for leaderboard
+  const { data: correctFlags, error: correctFlagsError } = await adminSupabase
+    .from("flag_attempts")
+    .select(`
+      *,
+      users:user_id (email, name)
+    `)
+    .eq("correct", true)
+    .order("submitted_at", { ascending: true });
+    
+  if (correctFlagsError) {
+    console.error("Failed to fetch correct flags:", correctFlagsError);
+  }
+
+  // Filter out banned users
+  const bannedUserIds = new Set<string>();
+  (cheatAttempts || []).forEach(c => {
+    bannedUserIds.add(c.submitter_id);
+    bannedUserIds.add(c.owner_id);
+  });
+
+  const formattedLeaderboard = (correctFlags || [])
+    .filter(a => !bannedUserIds.has(a.user_id))
+    .map((a) => ({
+      id: a.id,
+      flag: a.flag,
+      round_id: a.round_id,
+      submitted_at: a.submitted_at,
+      user_id: a.user_id,
+      users: a.users
+        ? {
+            email: a.users.email || "",
+            name: a.users.name || "",
+          }
+        : undefined,
+    }));
+
   return (
     <DashboardClient
       totalUsers={totalUsers}
@@ -209,6 +246,7 @@ export default async function DashboardPage() {
       allAttempts={formattedAttempts}
       cheatAttempts={cheatAttempts || []}
       timelineSubmissions={formattedTimelineSubmissions}
+      leaderboardData={formattedLeaderboard}
     />
   );
 }

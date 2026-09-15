@@ -59,6 +59,14 @@ interface DashboardProps {
     users?: { email: string; name: string };
     round_id: number;
   }>;
+  leaderboardData: Array<{
+    id: string;
+    flag: string;
+    round_id: number;
+    submitted_at: string;
+    user_id: string;
+    users?: { email: string; name: string };
+  }>;
 }
 
 function formatTimestamp(value: string | null | undefined) {
@@ -81,12 +89,66 @@ export function DashboardClient({
   allAttempts,
   cheatAttempts,
   timelineSubmissions,
+  leaderboardData,
 }: DashboardProps) {
   const [activeTab, setActiveTab] = useState<"overview" | "schedule" | "users" | "attempts" | "cheats" | "timelines">("overview");
   const [rounds, setRounds] = useState(initialRoundsList);
   const [savingRound, setSavingRound] = useState<number | null>(null);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState<string | null>(null);
+
+  const handleDownloadCSV = () => {
+    let csvContent = "data:text/csv;charset=utf-8,";
+    
+    if (activeTab === "users") {
+      csvContent += "Email,Name,User ID,Role,Joined Date\n";
+      allUsers.forEach(u => {
+        csvContent += `"${u.email}","${u.name || ''}","${u.id}","${u.role}","${formatDate(u.created_at)}"\n`;
+      });
+    } else if (activeTab === "overview") {
+      csvContent += "User,Round,Status,Score,Time\n";
+      allProgress.forEach(p => {
+        csvContent += `"${p.users?.email || p.user_id}","${p.round_id}","${p.status}","${p.score || ''}","${formatTimestamp(p.completed_at)}"\n`;
+      });
+    } else if (activeTab === "attempts") {
+      csvContent += "User,Round,Flag,Result,Time\n";
+      allAttempts.forEach(a => {
+        csvContent += `"${a.users?.email || '-'}","${a.round_id}","${a.flag.replace(/"/g, '""')}","${a.correct ? 'CORRECT' : 'WRONG'}","${formatTimestamp(a.submitted_at)}"\n`;
+      });
+    } else if (activeTab === "cheats") {
+      csvContent += "Submitter,Flag Owner,Round,Flag,Status,Detected\n";
+      cheatAttempts.forEach(c => {
+        const submitterEmail = allUsers.find(u => u.id === c.submitter_id)?.email || c.submitter_id;
+        const ownerEmail = allUsers.find(u => u.id === c.owner_id)?.email || c.owner_id;
+        csvContent += `"${submitterEmail}","${ownerEmail}","${c.round_id}","${c.flag.replace(/"/g, '""')}","${c.status.toUpperCase()}","${formatTimestamp(c.detected_at)}"\n`;
+      });
+    } else if (activeTab === "timelines") {
+      csvContent += "=== CORRECT FLAG LEADERBOARD ===\n";
+      csvContent += "Rank,User,Round,Time,Flag\n";
+      leaderboardData.forEach((l, index) => {
+        csvContent += `"${index + 1}","${l.users?.email || 'Unknown'}","${l.round_id}","${formatTimestamp(l.submitted_at)}","${l.flag.replace(/"/g, '""')}"\n`;
+      });
+      csvContent += "\n=== TIMELINE SUBMISSIONS (ROUND 3) ===\n";
+      csvContent += "User,Time,Content\n";
+      timelineSubmissions.forEach(t => {
+        csvContent += `"${t.users?.email || 'Unknown'}","${formatTimestamp(t.submitted_at)}","${t.content.replace(/"/g, '""').replace(/\n/g, ' ')}"\n`;
+      });
+    } else if (activeTab === "schedule") {
+      csvContent += "Round,Title,Unlock Date,Status\n";
+      rounds.forEach(r => {
+        csvContent += `"${r.number}","${r.title}","${r.unlock_date}","${r.is_active ? 'ACTIVE' : 'LOCKED'}"\n`;
+      });
+    }
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `${activeTab}_export.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
 
   useEffect(() => {
     setCurrentTime(new Date().toLocaleString());
@@ -127,42 +189,50 @@ export function DashboardClient({
         <div className="flex items-center gap-4">
           <PixelSoldier />
           <div>
-            <h1 className="font-pixel text-xl text-[#00ff41]">
+            <h1 className="font-pixel text-2xl text-[#00ff41]">
               OPERATION BLACKOUT
             </h1>
-            <p className="font-terminal text-sm text-[#ffb000]">
+            <p className="font-terminal text-base text-[#ffb000]">
               ORGANIZER DASHBOARD
             </p>
           </div>
         </div>
-        <div className="font-terminal text-sm text-[#666]">
-          {currentTime ?? "--"}
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={handleDownloadCSV}
+            className="pixel-btn text-xs bg-[#ffb000] text-black font-bold py-2 px-4 hover:bg-[#ffc000]"
+          >
+            DOWNLOAD CSV
+          </button>
+          <div className="font-terminal text-base text-[#666]">
+            {currentTime ?? "--"}
+          </div>
         </div>
       </div>
 
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
         <div className="pixel-border bg-[#0d1117] p-4">
-          <div className="font-pixel text-[10px] text-[#666] mb-2">
+          <div className="font-pixel text-xs text-[#666] mb-2">
             TOTAL REGISTERED USERS
           </div>
-          <div className="font-terminal text-3xl text-[#00ff41]">
+          <div className="font-terminal text-4xl text-[#00ff41]">
             {totalUsers}
           </div>
-          <div className="font-terminal text-xs text-[#ffb000] mt-1">
+          <div className="font-terminal text-sm text-[#ffb000] mt-1">
             Admins: {allUsers.filter((u) => u.role === "admin").length} | Participants: {allUsers.filter((u) => u.role === "participant").length}
           </div>
         </div>
 
         {roundStats.map((stat) => (
           <div key={stat.round} className="pixel-border bg-[#0d1117] p-4">
-            <div className="font-pixel text-[10px] text-[#666] mb-2">
+            <div className="font-pixel text-xs text-[#666] mb-2">
               ROUND {stat.round}
             </div>
-            <div className="font-terminal text-3xl text-[#ffb000]">
+            <div className="font-terminal text-4xl text-[#ffb000]">
               {stat.completed}/{stat.total}
             </div>
-            <div className="font-terminal text-xs text-[#666] mt-1">
+            <div className="font-terminal text-sm text-[#666] mt-1">
               Avg Score: {stat.avgScore}
             </div>
           </div>
@@ -175,7 +245,7 @@ export function DashboardClient({
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`pixel-btn text-xs ${
+            className={`pixel-btn text-sm ${
               activeTab === tab
                 ? "bg-[#00ff41] text-black font-bold"
                 : "bg-[#1a472a] text-[#00ff41]"
@@ -191,7 +261,7 @@ export function DashboardClient({
       </div>
 
       {saveStatus && (
-        <div className="mb-4 p-3 bg-[#1a472a] border border-[#00ff41] font-terminal text-sm text-[#00ff41] rounded">
+        <div className="mb-4 p-3 bg-[#1a472a] border border-[#00ff41] font-terminal text-base text-[#00ff41] rounded">
           {saveStatus}
         </div>
       )}
@@ -200,10 +270,10 @@ export function DashboardClient({
       <div className="pixel-border bg-[#0d1117] p-4">
         {activeTab === "schedule" && (
           <div>
-            <h2 className="font-pixel text-sm text-[#00ff41] mb-2">
+            <h2 className="font-pixel text-base text-[#00ff41] mb-2">
               ROUND UNLOCK SCHEDULE & EVENT TIMINGS
             </h2>
-            <p className="font-terminal text-xs text-[#ffb000] mb-6">
+            <p className="font-terminal text-sm text-[#ffb000] mb-6">
               Set the exact date, time, and active status for each round. Participants who finish early will see a countdown popup until the scheduled unlock time.
             </p>
 
@@ -224,11 +294,11 @@ export function DashboardClient({
                 return (
                   <div key={num} className="border border-[#1a472a] bg-[#0a0a0a] p-4 rounded">
                     <div className="flex justify-between items-center mb-4">
-                      <span className="font-pixel text-sm text-[#00ff41]">
+                      <span className="font-pixel text-base text-[#00ff41]">
                         ROUND {num}
                       </span>
                       <span
-                        className={`font-terminal text-xs px-2 py-1 ${
+                        className={`font-terminal text-sm px-2 py-1 ${
                           roundInfo.is_active
                             ? "bg-[#00ff41]/20 text-[#00ff41]"
                             : "bg-red-500/20 text-red-500"
@@ -238,7 +308,7 @@ export function DashboardClient({
                       </span>
                     </div>
 
-                    <div className="space-y-4 font-terminal text-xs">
+                    <div className="space-y-4 font-terminal text-sm">
                       <div>
                         <label className="block text-[#666] mb-1">
                           Unlock Date & Time (Local Event Time):
@@ -279,7 +349,7 @@ export function DashboardClient({
                           const isoDate = new Date(dateVal).toISOString();
                           handleUpdateRoundSchedule(num, isoDate, activeVal);
                         }}
-                        className="pixel-btn text-xs w-full bg-[#00ff41] text-black font-bold py-2 mt-2"
+                        className="pixel-btn text-sm w-full bg-[#00ff41] text-black font-bold py-2 mt-2"
                       >
                         {savingRound === num ? "SAVING..." : `SAVE ROUND ${num} SCHEDULE`}
                       </button>
@@ -292,14 +362,14 @@ export function DashboardClient({
         )}
         {activeTab === "users" && (
           <div>
-            <h2 className="font-pixel text-sm text-[#00ff41] mb-4 flex items-center justify-between">
+            <h2 className="font-pixel text-base text-[#00ff41] mb-4 flex items-center justify-between">
               <span>REGISTERED USERS & ROLES</span>
-              <span className="text-xs text-[#ffb000] font-terminal font-normal">
+              <span className="text-sm text-[#ffb000] font-terminal font-normal">
                 Admins checked from Supabase `admins` table & `ADMIN_EMAILS`
               </span>
             </h2>
             <div className="overflow-x-auto">
-              <table className="w-full font-terminal text-sm">
+              <table className="w-full font-terminal text-base">
                 <thead>
                   <tr className="border-b border-[#1a472a]">
                     <th className="text-left py-2 text-[#666]">Email / Name</th>
@@ -327,12 +397,12 @@ export function DashboardClient({
                           <td className="py-2 text-[#00ff41]">
                             {u.email} {u.name ? `(${u.name})` : ""}
                           </td>
-                          <td className="py-2 font-mono text-xs text-[#666]">
+                          <td className="py-2 font-mono text-sm text-[#666]">
                             {u.id}
                           </td>
                           <td className="py-2">
                             <span
-                              className={`px-2 py-1 text-xs font-bold ${
+                              className={`px-2 py-1 text-sm font-bold ${
                                 u.role === "admin"
                                   ? "bg-[#ffb000]/20 text-[#ffb000] border border-[#ffb000]"
                                   : "bg-[#00ff41]/10 text-[#00ff41]"
@@ -358,11 +428,11 @@ export function DashboardClient({
         )}
         {activeTab === "overview" && (
           <div>
-            <h2 className="font-pixel text-sm text-[#00ff41] mb-4">
+            <h2 className="font-pixel text-base text-[#00ff41] mb-4">
               USER PROGRESS
             </h2>
             <div className="overflow-x-auto">
-              <table className="w-full font-terminal text-sm">
+              <table className="w-full font-terminal text-base">
                 <thead>
                   <tr className="border-b border-[#1a472a]">
                     <th className="text-left py-2 text-[#666]">User</th>
@@ -417,7 +487,7 @@ export function DashboardClient({
                         </td>
                         <td className="py-2">
                           <span
-                            className={`px-2 py-1 text-xs ${
+                            className={`px-2 py-1 text-sm ${
                               p.status === "completed"
                                 ? "bg-[#00ff41]/20 text-[#00ff41]"
                                 : p.status === "in_progress"
@@ -445,11 +515,11 @@ export function DashboardClient({
 
         {activeTab === "attempts" && (
           <div>
-            <h2 className="font-pixel text-sm text-[#00ff41] mb-4">
+            <h2 className="font-pixel text-base text-[#00ff41] mb-4">
               FLAG ATTEMPTS
             </h2>
             <div className="overflow-x-auto">
-              <table className="w-full font-terminal text-sm">
+              <table className="w-full font-terminal text-base">
                 <thead>
                   <tr className="border-b border-[#1a472a]">
                     <th className="text-left py-2 text-[#666]">User</th>
@@ -474,12 +544,12 @@ export function DashboardClient({
                       <td className="py-2 text-[#ffb000]">
                         Round {a.round_id}
                       </td>
-                      <td className="py-2 text-[#666] font-mono text-xs max-w-xs truncate">
+                      <td className="py-2 text-[#666] font-mono text-sm max-w-xs truncate">
                         {a.flag}
                       </td>
                       <td className="py-2">
                         <span
-                          className={`px-2 py-1 text-xs ${
+                          className={`px-2 py-1 text-sm ${
                             a.correct
                               ? "bg-[#00ff41]/20 text-[#00ff41]"
                               : "bg-red-500/20 text-red-500"
@@ -501,7 +571,7 @@ export function DashboardClient({
 
         {activeTab === "cheats" && (
           <div>
-            <h2 className="font-pixel text-sm text-red-500 mb-4">
+            <h2 className="font-pixel text-base text-red-500 mb-4">
               CHEATING ATTEMPTS
             </h2>
             {cheatAttempts.length === 0 ? (
@@ -510,7 +580,7 @@ export function DashboardClient({
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full font-terminal text-sm">
+                <table className="w-full font-terminal text-base">
                   <thead>
                     <tr className="border-b border-[#1a472a]">
                       <th className="text-left py-2 text-[#666]">Submitter</th>
@@ -533,11 +603,11 @@ export function DashboardClient({
                         <td className="py-2 text-[#666]">
                           Round {c.round_id}
                         </td>
-                        <td className="py-2 text-[#666] font-mono text-xs max-w-xs truncate">
+                        <td className="py-2 text-[#666] font-mono text-sm max-w-xs truncate">
                           {c.flag}
                         </td>
                         <td className="py-2">
-                          <span className="px-2 py-1 text-xs bg-red-500/20 text-red-500">
+                          <span className="px-2 py-1 text-sm bg-red-500/20 text-red-500">
                             {c.status.toUpperCase()}
                           </span>
                         </td>
@@ -554,36 +624,72 @@ export function DashboardClient({
         )}
 
         {activeTab === "timelines" && (
-          <div>
-            <h2 className="font-pixel text-sm text-[#00ff41] mb-4">
-              TIMELINE SUBMISSIONS (ROUND 3)
-            </h2>
-            {timelineSubmissions.length === 0 ? (
-              <div className="font-terminal text-[#666] text-center py-8">
-                No timeline submissions yet.
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {timelineSubmissions.map((t) => (
-                  <div
-                    key={t.id}
-                    className="border border-[#1a472a] p-4"
-                  >
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="font-pixel text-xs text-[#00ff41]">
-                        {t.users?.email || "Unknown"}
-                      </span>
-                      <span className="font-terminal text-xs text-[#666]">
-                        {formatTimestamp(t.submitted_at)}
-                      </span>
+          <div className="space-y-8">
+            <div>
+              <h2 className="font-pixel text-base text-[#00ff41] mb-4">
+                CORRECT FLAG SUBMISSIONS (LEADERBOARD)
+              </h2>
+              {leaderboardData.length === 0 ? (
+                <div className="font-terminal text-[#666] text-center py-8">
+                  No correct flags submitted yet.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full font-terminal text-base">
+                    <thead>
+                      <tr className="border-b border-[#1a472a]">
+                        <th className="text-left py-2 text-[#666]">Rank</th>
+                        <th className="text-left py-2 text-[#666]">User</th>
+                        <th className="text-left py-2 text-[#666]">Round</th>
+                        <th className="text-left py-2 text-[#666]">Time</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {leaderboardData.map((l, idx) => (
+                        <tr key={l.id} className="border-b border-[#1a472a]/50">
+                          <td className="py-2 text-[#ffb000]">#{idx + 1}</td>
+                          <td className="py-2 text-[#00ff41]">{l.users?.email || "Unknown"}</td>
+                          <td className="py-2 text-[#ffb000]">Round {l.round_id}</td>
+                          <td className="py-2 text-[#666]">{formatTimestamp(l.submitted_at)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <h2 className="font-pixel text-base text-[#00ff41] mb-4">
+                INCIDENT TIMELINE SUBMISSIONS (ROUND 3)
+              </h2>
+              {timelineSubmissions.length === 0 ? (
+                <div className="font-terminal text-[#666] text-center py-8">
+                  No timeline submissions yet.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {timelineSubmissions.map((t) => (
+                    <div
+                      key={t.id}
+                      className="border border-[#1a472a] p-4"
+                    >
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="font-pixel text-sm text-[#00ff41]">
+                          {t.users?.email || "Unknown"}
+                        </span>
+                        <span className="font-terminal text-sm text-[#666]">
+                          {formatTimestamp(t.submitted_at)}
+                        </span>
+                      </div>
+                      <pre className="font-terminal text-base text-[#ffb000] whitespace-pre-wrap">
+                        {t.content}
+                      </pre>
                     </div>
-                    <pre className="font-terminal text-sm text-[#ffb000] whitespace-pre-wrap">
-                      {t.content}
-                    </pre>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
