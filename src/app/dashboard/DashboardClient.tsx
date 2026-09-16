@@ -88,6 +88,11 @@ function getLocalDatetime(isoString: string | null | undefined) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+function csvEscape(value: unknown) {
+  if (value === null || value === undefined) return "";
+  return `"${String(value).replace(/"/g, '""')}"`;
+}
+
 export function DashboardClient({
   totalUsers,
   allUsers,
@@ -106,60 +111,84 @@ export function DashboardClient({
   const [currentTime, setCurrentTime] = useState<string | null>(null);
 
   const handleDownloadCSV = () => {
-    let csvContent = "data:text/csv;charset=utf-8,";
+    const parts: string[] = [];
+    const section = (title: string) => parts.push(`\n===== ${title} =====\n`);
+    const row = (cells: unknown[]) => parts.push(cells.map(csvEscape).join(","));
 
-    if (activeTab === "users") {
-      csvContent += "Email,Name,User ID,Role,Joined Date\n";
-      allUsers.forEach(u => {
-        csvContent += `"${u.email}","${u.name || ''}","${u.id}","${u.role}","${formatDate(u.created_at)}"\n`;
-      });
-    } else if (activeTab === "overview") {
-      csvContent += "User,Round,Status,Score,Time\n";
-      allProgress.forEach(p => {
-        csvContent += `"${p.users?.email || p.user_id}","${p.round_id}","${p.status}","${p.score || ''}","${formatTimestamp(p.completed_at)}"\n`;
-      });
-    } else if (activeTab === "attempts") {
-      csvContent += "User,Round,Flag,Result,Time\n";
-      allAttempts.forEach(a => {
-        csvContent += `"${a.users?.email || '-'}","${a.round_id}","${a.flag.replace(/"/g, '""')}","${a.correct ? 'CORRECT' : 'WRONG'}","${formatTimestamp(a.submitted_at)}"\n`;
-      });
-    } else if (activeTab === "cheats") {
-      csvContent += "Submitter,Flag Owner,Round,Flag,Status,Detected\n";
-      cheatAttempts.forEach(c => {
-        const submitterEmail = allUsers.find(u => u.id === c.submitter_id)?.email || c.submitter_id;
-        const ownerEmail = allUsers.find(u => u.id === c.owner_id)?.email || c.owner_id;
-        csvContent += `"${submitterEmail}","${ownerEmail}","${c.round_id}","${c.flag.replace(/"/g, '""')}","${c.status.toUpperCase()}","${formatTimestamp(c.detected_at)}"\n`;
-      });
-    } else if (activeTab === "timelines") {
-      csvContent += "=== CORRECT FLAG LEADERBOARD ===\n";
-      csvContent += "Rank,User,Round,Time,Flag\n";
-      leaderboardData.forEach((l, index) => {
-        csvContent += `"${index + 1}","${l.users?.email || 'Unknown'}","${l.round_id}","${formatTimestamp(l.submitted_at)}","${l.flag.replace(/"/g, '""')}"\n`;
-      });
-      csvContent += "\n=== TIMELINE SUBMISSIONS (ROUND 3) ===\n";
-      csvContent += "User,Time,Content\n";
-      timelineSubmissions.forEach(t => {
-        csvContent += `"${t.users?.email || 'Unknown'}","${formatTimestamp(t.submitted_at)}","${t.content.replace(/"/g, '""').replace(/\n/g, ' ')}"\n`;
-      });
-    } else if (activeTab === "schedule") {
-      csvContent += "Round,Title,Unlock Date,Status\n";
-      rounds.forEach(r => {
-        csvContent += `"${r.number}","${r.title}","${r.unlock_date}","${r.is_active ? 'ACTIVE' : 'LOCKED'}"\n`;
-      });
-    }
+    section("USERS (ALL)");
+    row(["Email", "Name", "User ID", "Role", "Joined Date"]);
+    allUsers.forEach((u) =>
+      row([u.email, u.name || "", u.id, u.role, formatDate(u.created_at)])
+    );
 
-    const encodedUri = encodeURI(csvContent);
+    section("ROUND SCHEDULE & LOCKS");
+    row(["Round", "Title", "Unlock Date", "Status"]);
+    rounds.forEach((r) =>
+      row([r.number, r.title, r.unlock_date, r.is_active ? "ACTIVE" : "LOCKED"])
+    );
+
+    section("USER PROGRESS (ALL)");
+    row(["User", "Round", "Status", "Score", "Started At", "Completed At"]);
+    allProgress.forEach((p) =>
+      row([
+        p.users?.email || p.user_id,
+        p.round_id,
+        p.status,
+        p.score ?? "",
+        formatTimestamp(p.started_at),
+        formatTimestamp(p.completed_at),
+      ])
+    );
+
+    section("FLAG ATTEMPTS (LAST 100)");
+    row(["User", "Round", "Flag", "Result", "Time"]);
+    allAttempts.forEach((a) =>
+      row([
+        a.users?.email || "-",
+        a.round_id,
+        a.flag,
+        a.correct ? "CORRECT" : "WRONG",
+        formatTimestamp(a.submitted_at),
+      ])
+    );
+
+    section("CHEATING ATTEMPTS");
+    row(["Submitter", "Flag Owner", "Round", "Flag", "Status", "Detected"]);
+    cheatAttempts.forEach((c) => {
+      const submitterEmail = allUsers.find((u) => u.id === c.submitter_id)?.email || c.submitter_id;
+      const ownerEmail = allUsers.find((u) => u.id === c.owner_id)?.email || c.owner_id;
+      row([submitterEmail, ownerEmail, c.round_id, c.flag, c.status.toUpperCase(), formatTimestamp(c.detected_at)]);
+    });
+
+    section("LEADERBOARD (CORRECT FLAGS)");
+    row(["Rank", "User", "Round", "Time", "Flag"]);
+    leaderboardData.forEach((l, index) =>
+      row([index + 1, l.users?.email || "Unknown", l.round_id, formatTimestamp(l.submitted_at), l.flag])
+    );
+
+    section("TIMELINE SUBMISSIONS (ROUND 3)");
+    row(["User", "Round", "Time", "Content"]);
+    timelineSubmissions.forEach((t) =>
+      row([t.users?.email || "Unknown", t.round_id, formatTimestamp(t.submitted_at), t.content])
+    );
+
+    const blob = new Blob(["\uFEFF" + parts.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `${activeTab}_export.csv`);
+    link.href = url;
+    link.download = `operation_blackout_export_${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
 
   useEffect(() => {
-    setCurrentTime(new Date().toLocaleString());
+    const updateTime = () => setCurrentTime(new Date().toLocaleString());
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleUpdateRoundSchedule = async (roundNumber: number, unlockDate: string, isActive: boolean) => {
@@ -210,7 +239,7 @@ export function DashboardClient({
             onClick={handleDownloadCSV}
             className="pixel-btn text-xs bg-[#ffb000] text-black font-bold py-2 px-4 hover:bg-[#ffc000]"
           >
-            DOWNLOAD CSV
+            EXPORT ALL DATA
           </button>
           <div className="font-terminal text-base text-[#666]">
             {currentTime ?? "--"}
