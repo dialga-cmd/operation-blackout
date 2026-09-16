@@ -107,7 +107,7 @@ export function DashboardClient({
 
   const handleDownloadCSV = () => {
     let csvContent = "data:text/csv;charset=utf-8,";
-    
+
     if (activeTab === "users") {
       csvContent += "Email,Name,User ID,Role,Joined Date\n";
       allUsers.forEach(u => {
@@ -206,7 +206,7 @@ export function DashboardClient({
           </div>
         </div>
         <div className="flex items-center gap-4">
-          <button 
+          <button
             onClick={handleDownloadCSV}
             className="pixel-btn text-xs bg-[#ffb000] text-black font-bold py-2 px-4 hover:bg-[#ffc000]"
           >
@@ -253,11 +253,10 @@ export function DashboardClient({
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`pixel-btn text-sm ${
-              activeTab === tab
+            className={`pixel-btn text-sm ${activeTab === tab
                 ? "bg-[#00ff41] text-black font-bold"
                 : "bg-[#1a472a] text-[#00ff41]"
-            }`}
+              }`}
           >
             {tab === "schedule"
               ? "ROUND SCHEDULE & LOCKS"
@@ -304,11 +303,10 @@ export function DashboardClient({
                         ROUND {num}
                       </span>
                       <span
-                        className={`font-terminal text-sm px-2 py-1 ${
-                          roundInfo.is_active
+                        className={`font-terminal text-sm px-2 py-1 ${roundInfo.is_active
                             ? "bg-[#00ff41]/20 text-[#00ff41]"
                             : "bg-red-500/20 text-red-500"
-                        }`}
+                          }`}
                       >
                         {roundInfo.is_active ? "ACTIVE" : "LOCKED"}
                       </span>
@@ -408,11 +406,10 @@ export function DashboardClient({
                           </td>
                           <td className="py-2">
                             <span
-                              className={`px-2 py-1 text-sm font-bold ${
-                                u.role === "admin"
+                              className={`px-2 py-1 text-sm font-bold ${u.role === "admin"
                                   ? "bg-[#ffb000]/20 text-[#ffb000] border border-[#ffb000]"
                                   : "bg-[#00ff41]/10 text-[#00ff41]"
-                              }`}
+                                }`}
                             >
                               {u.role.toUpperCase()}
                             </span>
@@ -449,70 +446,65 @@ export function DashboardClient({
                   </tr>
                 </thead>
                 <tbody>
-                  {allProgress.length === 0 ? (
+                  {allUsers.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="py-4 text-center text-[#666]">
-                        No progress records found.
+                        No users registered yet.
                       </td>
                     </tr>
-                  ) : (() => {
-                    const statusWeight: Record<string, number> = {
-                      "completed": 3,
-                      "in_progress": 2,
-                      "available": 1
-                    };
-                    const uniqueProgress = Object.values(
-                      allProgress.reduce((acc, p) => {
-                        const current = acc[p.user_id];
-                        if (!current) {
-                          acc[p.user_id] = p;
-                          return acc;
-                        }
-                        
-                        const currentWeight = statusWeight[current.status] || 0;
-                        const pWeight = statusWeight[p.status] || 0;
-                        
-                        if (pWeight > currentWeight) {
-                          acc[p.user_id] = p;
-                        } else if (pWeight === currentWeight) {
-                          if (p.round_id > current.round_id) {
-                            acc[p.user_id] = p;
-                          }
-                        }
-                        return acc;
-                      }, {} as Record<string, typeof allProgress[0]>)
-                    );
-                    
-                    return uniqueProgress.map((p) => (
-                      <tr key={`${p.user_id}-${p.round_id}`} className="border-b border-[#1a472a]/50">
-                        <td className="py-2 text-[#00ff41]">
-                          {p.users?.name ? `${p.users.name} (${p.users.email})` : p.users?.email || p.user_id}
-                        </td>
-                        <td className="py-2 text-[#ffb000]">
-                          Round {p.round_id}
-                        </td>
-                        <td className="py-2">
-                          <span
-                            className={`px-2 py-1 text-sm ${
-                              p.status === "completed"
-                                ? "bg-[#00ff41]/20 text-[#00ff41]"
-                                : p.status === "in_progress"
-                                  ? "bg-[#ffb000]/20 text-[#ffb000]"
-                                  : "bg-[#666]/20 text-[#666]"
-                            }`}
-                          >
-                            {p.status}
-                          </span>
-                        </td>
-                        <td className="py-2 text-[#00ff41]">
-                          {p.score || "-"}
-                        </td>
-                        <td className="py-2 text-[#666]">
-                          {formatTimestamp(p.completed_at)}
-                        </td>
-                      </tr>
-                    ));
-                  })()}
+                  ) : (
+                    allUsers.map((u) => {
+                      // Find highest progress for this user
+                      const userProgress = allProgress.filter((p) => p.user_id === u.id);
+                      let highestProgress = userProgress[0];
+                      if (userProgress.length > 1) {
+                        const statusWeight: Record<string, number> = {
+                          "completed": 3,
+                          "in_progress": 2,
+                          "available": 1,
+                          "locked": 0
+                        };
+                        highestProgress = userProgress.reduce((prev, curr) => {
+                          const prevW = statusWeight[prev.status] || 0;
+                          const currW = statusWeight[curr.status] || 0;
+                          if (currW > prevW) return curr;
+                          if (currW === prevW && curr.round_id > prev.round_id) return curr;
+                          return prev;
+                        });
+                      }
+
+                      return (
+                        <tr key={u.id} className="border-b border-[#1a472a]/50">
+                          <td className="py-2 text-[#00ff41]">
+                            {u.name ? `${u.name} (${u.email})` : u.email}
+                          </td>
+                          <td className="py-2 text-[#ffb000]">
+                            {highestProgress ? `Round ${highestProgress.round_id}` : "Not Started"}
+                          </td>
+                          <td className="py-2">
+                            <span
+                              className={`px-2 py-1 text-sm ${!highestProgress
+                                  ? "bg-[#666]/20 text-[#666]"
+                                  : highestProgress.status === "completed"
+                                    ? "bg-[#00ff41]/20 text-[#00ff41]"
+                                    : highestProgress.status === "in_progress"
+                                      ? "bg-[#ffb000]/20 text-[#ffb000]"
+                                      : "bg-[#666]/20 text-[#666]"
+                                }`}
+                            >
+                              {highestProgress ? highestProgress.status : "locked"}
+                            </span>
+                          </td>
+                          <td className="py-2 text-[#00ff41]">
+                            {highestProgress?.score || "-"}
+                          </td>
+                          <td className="py-2 text-[#666]">
+                            {highestProgress?.completed_at ? formatTimestamp(highestProgress.completed_at) : "-"}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
@@ -555,11 +547,10 @@ export function DashboardClient({
                       </td>
                       <td className="py-2">
                         <span
-                          className={`px-2 py-1 text-sm ${
-                            a.correct
+                          className={`px-2 py-1 text-sm ${a.correct
                               ? "bg-[#00ff41]/20 text-[#00ff41]"
                               : "bg-red-500/20 text-red-500"
-                          }`}
+                            }`}
                         >
                           {a.correct ? "CORRECT" : "WRONG"}
                         </span>
