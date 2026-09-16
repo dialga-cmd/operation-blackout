@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap');
 @import "tailwindcss";
 
 :root {
@@ -12,6 +12,8 @@
   --cyan: #00d4ff;
   --pixel-font: 'Press Start 2P', monospace;
   --terminal-font: 'VT323', monospace;
+  --royal-font: 'Cinzel', serif;
+  --royal-serif-font: 'Cormorant Garamond', serif;
 }
 
 @theme inline {
@@ -25,6 +27,8 @@
   --color-cyan: var(--cyan);
   --font-pixel: var(--pixel-font);
   --font-terminal: var(--terminal-font);
+  --font-royal: var(--royal-font);
+  --font-royal-serif: var(--royal-serif-font);
 }
 
 * {

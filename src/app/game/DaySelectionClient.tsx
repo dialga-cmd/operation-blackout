@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { UserProgress, Round } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 import { PixelLock, PixelUnlock, PixelProgressSprite, PixelSoldier } from "@/components/pixel-art";
+import { StoryReveal } from "@/components/story/StoryReveal";
+import { storyChapters } from "@/data/story";
 
 interface DaySelectionProps {
   progress: UserProgress[];
@@ -14,6 +16,7 @@ interface DaySelectionProps {
 export function DaySelectionClient({ progress, rounds }: DaySelectionProps) {
   const router = useRouter();
   const [now, setNow] = useState<number>(0);
+  const [activeStory, setActiveStory] = useState<number | null>(null);
 
   useEffect(() => {
     setNow(Date.now());
@@ -101,25 +104,80 @@ export function DaySelectionClient({ progress, rounds }: DaySelectionProps) {
       );
     }
 
+    const storyUnlocked = isCompleted;
+    const storyChapter = storyChapters[dayNum];
+
     return (
-      <div 
-        key={dayNum} 
-        onClick={handleSelect}
-        className={`p-6 flex flex-col items-center justify-center text-center w-full h-64 ${bgClass}`}
-      >
-        <div className="mb-4">
-          {icon}
+      <div key={dayNum} className="flex flex-col gap-6">
+        {/* Day box */}
+        <div
+          onClick={handleSelect}
+          className={`p-6 flex flex-col items-center justify-center text-center w-full h-64 ${bgClass}`}
+        >
+          <div className="mb-4">
+            {icon}
+          </div>
+          <h2 className={`font-pixel text-xl ${textClass}`}>DAY {dayNum}</h2>
+          <div className={`font-terminal text-sm mt-2 mb-2 ${textClass === 'text-[#666]' ? 'text-[#888]' : 'text-white'}`}>
+            {roundInfo?.title?.toUpperCase() || `MISSION ${dayNum}`}
+          </div>
+          {content}
         </div>
-        <h2 className={`font-pixel text-xl ${textClass}`}>DAY {dayNum}</h2>
-        <div className={`font-terminal text-sm mt-2 mb-2 ${textClass === 'text-[#666]' ? 'text-[#888]' : 'text-white'}`}>
-          {roundInfo?.title?.toUpperCase() || `MISSION ${dayNum}`}
+
+        {/* Story box */}
+        <div
+          onClick={() => {
+            if (storyUnlocked) setActiveStory(dayNum);
+          }}
+          className={`group relative flex flex-col items-center justify-between px-5 py-6 text-center border-2 min-h-[148px] transition-all duration-300 backdrop-blur-sm ${
+            storyUnlocked
+              ? "border-[#6b5d3e]/70 bg-[#0d0b07]/80 cursor-pointer hover:border-[#b8a05a] hover:bg-[#b8a05a]/10 shadow-[0_0_18px_rgba(184,160,90,0.15)]"
+              : "border-[#3a3427]/60 bg-[#0a0906]/60 opacity-60"
+          }`}
+        >
+          {storyUnlocked ? (
+            <>
+              <div className="font-royal text-[10px] tracking-[0.4em] text-[#00ff41]/70">
+                STORY — DAY {dayNum}
+              </div>
+              <div className="font-royal text-lg font-semibold text-[#ece3cf]">
+                {storyChapter?.title}
+              </div>
+              <div className="h-px w-14 bg-gradient-to-r from-transparent via-[#b8a05a]/80 to-transparent" />
+              <div className="font-royal-serif text-sm italic leading-relaxed text-[#cfc2a4]/90">
+                {storyChapter?.lines[0]}
+              </div>
+              <div className="font-royal text-[10px] tracking-[0.35em] text-[#b8a05a] opacity-70 transition-opacity duration-300 group-hover:opacity-100">
+                PLAY STORY &rsaquo;
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="font-royal text-[10px] tracking-[0.4em] text-[#00ff41]/40">
+                STORY — DAY {dayNum}
+              </div>
+              <div className="font-royal text-lg font-semibold text-[#7a6f55]">
+                {storyChapter?.title}
+              </div>
+              <div className="h-px w-14 bg-[#3a3427]" />
+              <div className="font-royal-serif text-sm italic text-[#6d6350]">
+                {storyUnlocked ? storyChapter?.lines[0] : "Classified. Recover the flag to unlock this chapter."}
+              </div>
+              <div className="flex items-center gap-2 font-royal text-[10px] tracking-[0.35em] text-[#6d6350]">
+                <span className="inline-block h-2 w-2 border border-[#6d6350] rounded-full" />
+                LOCKED
+              </div>
+            </>
+          )}
         </div>
-        {content}
       </div>
     );
   };
 
+  const activeChapter = activeStory ? storyChapters[activeStory] : null;
+
   return (
+    <>
     <div 
       className="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden"
       style={{
@@ -157,5 +215,9 @@ export function DaySelectionClient({ progress, rounds }: DaySelectionProps) {
         </div>
       </div>
     </div>
+    {activeChapter && (
+      <StoryReveal chapter={activeChapter} onComplete={() => setActiveStory(null)} />
+    )}
+    </>
   );
 }

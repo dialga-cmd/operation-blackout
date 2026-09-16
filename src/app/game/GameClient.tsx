@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { Terminal } from "@/components/terminal/Terminal";
 import { PixelSoldier, PixelProgressSprite } from "@/components/pixel-art";
+import { StoryReveal } from "@/components/story/StoryReveal";
+import { storyChapters } from "@/data/story";
 import { UserProgress, Round, VFSRound } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -25,7 +27,7 @@ export function GameClient({
 }: GameClientProps) {
   const [roundData, setRoundData] = useState<VFSRound | null>(null);
   const [loading, setLoading] = useState(true);
-  const [flagMessage, setFlagMessage] = useState<string | null>(null);
+  const [pendingStory, setPendingStory] = useState<number | null>(null);
   const [countdownText, setCountdownText] = useState<string>("");
   const router = useRouter();
 
@@ -108,8 +110,7 @@ export function GameClient({
       const data = await res.json();
 
       if (data.success) {
-        setFlagMessage(`ROUND ${currentRound} COMPLETE!`);
-        setTimeout(() => setFlagMessage(null), 3000);
+        setPendingStory(currentRound);
       }
 
       return data;
@@ -154,108 +155,106 @@ export function GameClient({
     );
   }
 
+  const storyChapter = pendingStory ? storyChapters[pendingStory] : null;
+  const isStoryActive = pendingStory !== null;
+
   return (
-    <div className="min-h-screen flex flex-col bg-[#0a0a0a] noise-bg">
-      {/* Top Bar */}
-      <div className="flex items-center justify-between px-4 py-3 bg-[#0d1117] border-b border-[#1a472a]">
-        <div className="flex items-center gap-4">
-          <Link href="/game" className="font-pixel text-sm text-[#00ff41] hover:text-[#ffb000] transition-colors cursor-pointer">
-            OPERATION BLACKOUT
-          </Link>
-          <div className="h-4 w-px bg-[#1a472a]" />
-          <span className="font-terminal text-sm text-[#ffb000]">
-            Round {currentRound}
-          </span>
-        </div>
+    <>
+      <div
+        className={`min-h-screen flex flex-col bg-[#0a0a0a] noise-bg transition-opacity duration-[1600ms] ease-in-out ${
+          isStoryActive ? "opacity-0 pointer-events-none" : "opacity-100"
+        }`}
+      >
+        {/* Top Bar */}
+        <div className="flex items-center justify-between px-4 py-3 bg-[#0d1117] border-b border-[#1a472a]">
+          <div className="flex items-center gap-4">
+            <Link href="/game" className="font-pixel text-sm text-[#00ff41] hover:text-[#ffb000] transition-colors cursor-pointer">
+              OPERATION BLACKOUT
+            </Link>
+            <div className="h-4 w-px bg-[#1a472a]" />
+            <span className="font-terminal text-sm text-[#ffb000]">
+              Round {currentRound}
+            </span>
+          </div>
 
-        <div className="flex items-center gap-4">
-          {/* Progress indicators */}
-          {rounds.map((round) => {
-            const roundProgress = progress.find(
-              (p) => p.round_id === round.number
-            );
-            const isCompleted = roundProgress?.status === "completed";
-            const isCurrent = round.number === currentRound;
+          <div className="flex items-center gap-4">
+            {/* Progress indicators */}
+            {rounds.map((round) => {
+              const roundProgress = progress.find(
+                (p) => p.round_id === round.number
+              );
+              const isCompleted = roundProgress?.status === "completed";
+              const isCurrent = round.number === currentRound;
 
-            return (
-              <div
-                key={round.number}
-                className={`flex items-center gap-2 px-3 py-1 ${
-                  isCurrent
-                    ? "bg-[#1a472a]/50 border border-[#00ff41]"
-                    : isCompleted
-                      ? "bg-[#00ff41]/10"
-                      : "bg-[#333]/30"
-                }`}
-              >
-                <PixelProgressSprite
-                  round={isCompleted ? round.number : 0}
-                />
-                <span
-                  className={`font-pixel text-[10px] ${
-                    isCompleted
-                      ? "text-[#00ff41]"
-                      : isCurrent
-                        ? "text-[#ffb000]"
-                        : "text-[#666]"
+              return (
+                <div
+                  key={round.number}
+                  className={`flex items-center gap-2 px-3 py-1 ${
+                    isCurrent
+                      ? "bg-[#1a472a]/50 border border-[#00ff41]"
+                      : isCompleted
+                        ? "bg-[#00ff41]/10"
+                        : "bg-[#333]/30"
                   }`}
                 >
-                  R{round.number}
-                </span>
-              </div>
-            );
-          })}
+                  <PixelProgressSprite
+                    round={isCompleted ? round.number : 0}
+                  />
+                  <span
+                    className={`font-pixel text-[10px] ${
+                      isCompleted
+                        ? "text-[#00ff41]"
+                        : isCurrent
+                          ? "text-[#ffb000]"
+                          : "text-[#666]"
+                    }`}
+                  >
+                    R{round.number}
+                  </span>
+                </div>
+              );
+            })}
 
-          <button
-            onClick={handleLogout}
-            className="font-pixel text-[9px] text-[#ffb000] hover:text-red-500 transition-colors px-2 py-1 border border-[#1a472a] hover:border-red-500"
-          >
-            SIGN OUT
-          </button>
-        </div>
-      </div>
-
-      {/* Main Terminal Area */}
-      <div className="flex-1 flex">
-        {/* Terminal */}
-        <div className="flex-1 flex flex-col">
-          {loading ? (
-            <div className="flex-1 flex items-center justify-center bg-[#0d1117]">
-              <div className="font-terminal text-[#00ff41] animate-pulse text-xl">
-                Loading filesystem...
-              </div>
-            </div>
-          ) : roundData ? (
-            <Terminal
-              roundData={roundData}
-              roundId={currentRound}
-              userId={userId}
-              onFlagSubmit={handleFlagSubmit}
-            />
-          ) : (
-            <div className="flex-1 flex items-center justify-center bg-[#0d1117]">
-              <div className="font-terminal text-red-500 text-xl">
-                Failed to load round data.
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Flag Success Overlay */}
-      {flagMessage && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/80 z-50">
-          <div className="pixel-border bg-[#0d1117] p-8 text-center animate-bounce">
-            <PixelSoldier />
-            <h2 className="font-pixel text-2xl text-[#00ff41] mt-4 glow-pulse">
-              {flagMessage}
-            </h2>
-            <p className="font-terminal text-lg text-[#ffb000] mt-2">
-              Proceeding to next round...
-            </p>
+            <button
+              onClick={handleLogout}
+              className="font-pixel text-[9px] text-[#ffb000] hover:text-red-500 transition-colors px-2 py-1 border border-[#1a472a] hover:border-red-500"
+            >
+              SIGN OUT
+            </button>
           </div>
         </div>
+
+        {/* Main Terminal Area */}
+        <div className="flex-1 flex">
+          {/* Terminal */}
+          <div className="flex-1 flex flex-col">
+            {loading ? (
+              <div className="flex-1 flex items-center justify-center bg-[#0d1117]">
+                <div className="font-terminal text-[#00ff41] animate-pulse text-xl">
+                  Loading filesystem...
+                </div>
+              </div>
+            ) : roundData ? (
+              <Terminal
+                roundData={roundData}
+                roundId={currentRound}
+                userId={userId}
+                onFlagSubmit={handleFlagSubmit}
+              />
+            ) : (
+              <div className="flex-1 flex items-center justify-center bg-[#0d1117]">
+                <div className="font-terminal text-red-500 text-xl">
+                  Failed to load round data.
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {storyChapter && (
+        <StoryReveal chapter={storyChapter} onComplete={() => router.push("/game")} />
       )}
-    </div>
+    </>
   );
 }
