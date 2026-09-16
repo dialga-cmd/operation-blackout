@@ -92,8 +92,16 @@ alter table public.flag_attempts enable row level security;
 alter table public.user_flag_keys enable row level security;
 alter table public.cheat_attempts enable row level security;
 alter table public.timeline_submissions enable row level security;
+alter table public.rounds enable row level security;
+
+-- (If admins table exists, enable RLS for it as well)
+-- alter table public.admins enable row level security;
 
 -- Policies
+create policy "Anyone can read rounds"
+  on public.rounds for select
+  using (true);
+
 create policy "Users can view own profile"
   on public.users for select
   using (auth.uid() = id);

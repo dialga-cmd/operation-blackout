@@ -80,6 +80,14 @@ function formatDate(value: string | null | undefined) {
   return formatTimestamp(value).slice(0, 10);
 }
 
+function getLocalDatetime(isoString: string | null | undefined) {
+  if (!isoString) return "";
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return "";
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export function DashboardClient({
   totalUsers,
   allUsers,
@@ -286,10 +294,8 @@ export function DashboardClient({
                   is_active: true,
                 };
 
-                // Convert ISO date to datetime-local input format YYYY-MM-DDTHH:mm
-                const formattedDateStr = roundInfo.unlock_date
-                  ? formatTimestamp(roundInfo.unlock_date).slice(0, 16)
-                  : "";
+                // Use local timezone format for datetime-local input YYYY-MM-DDTHH:mm
+                const formattedDateStr = getLocalDatetime(roundInfo.unlock_date);
 
                 return (
                   <div key={num} className="border border-[#1a472a] bg-[#0a0a0a] p-4 rounded">
@@ -480,7 +486,7 @@ export function DashboardClient({
                     return uniqueProgress.map((p) => (
                       <tr key={`${p.user_id}-${p.round_id}`} className="border-b border-[#1a472a]/50">
                         <td className="py-2 text-[#00ff41]">
-                          {p.users?.email || p.user_id}
+                          {p.users?.name ? `${p.users.name} (${p.users.email})` : p.users?.email || p.user_id}
                         </td>
                         <td className="py-2 text-[#ffb000]">
                           Round {p.round_id}
@@ -539,7 +545,7 @@ export function DashboardClient({
                   ) : allAttempts.map((a) => (
                     <tr key={a.id} className="border-b border-[#1a472a]/50">
                       <td className="py-2 text-[#00ff41]">
-                        {a.users?.email || "-"}
+                        {a.users?.name ? `${a.users.name} (${a.users.email})` : a.users?.email || "-"}
                       </td>
                       <td className="py-2 text-[#ffb000]">
                         Round {a.round_id}
@@ -648,7 +654,9 @@ export function DashboardClient({
                       {leaderboardData.map((l, idx) => (
                         <tr key={l.id} className="border-b border-[#1a472a]/50">
                           <td className="py-2 text-[#ffb000]">#{idx + 1}</td>
-                          <td className="py-2 text-[#00ff41]">{l.users?.email || "Unknown"}</td>
+                          <td className="py-2 text-[#00ff41]">
+                            {l.users?.name ? `${l.users.name} (${l.users.email})` : l.users?.email || "Unknown"}
+                          </td>
                           <td className="py-2 text-[#ffb000]">Round {l.round_id}</td>
                           <td className="py-2 text-[#666]">{formatTimestamp(l.submitted_at)}</td>
                         </tr>
