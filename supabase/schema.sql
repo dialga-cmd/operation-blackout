@@ -158,13 +158,15 @@ create policy "Users can insert own timelines"
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
-  insert into public.users (id, email, name, avatar_url)
-  values (
-    new.id,
-    new.email,
-    coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name'),
-    coalesce(new.raw_user_meta_data->>'avatar_url', null)
-  );
+  if new.email like '%.iitm.ac.in' then
+    insert into public.users (id, email, name, avatar_url)
+    values (
+      new.id,
+      new.email,
+      coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name'),
+      coalesce(new.raw_user_meta_data->>'avatar_url', null)
+    );
+  end if;
   return new;
 end;
 $$ language plpgsql security definer;
