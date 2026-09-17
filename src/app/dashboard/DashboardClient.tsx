@@ -52,13 +52,6 @@ interface DashboardProps {
     detected_at: string;
     status: string;
   }>;
-  timelineSubmissions: Array<{
-    id: string;
-    content: string;
-    submitted_at: string;
-    users?: { email: string; name: string };
-    round_id: number;
-  }>;
   leaderboardData: Array<{
     id: string;
     flag: string;
@@ -101,7 +94,6 @@ export function DashboardClient({
   allProgress,
   allAttempts,
   cheatAttempts,
-  timelineSubmissions,
   leaderboardData,
 }: DashboardProps) {
   const [activeTab, setActiveTab] = useState<"overview" | "schedule" | "users" | "attempts" | "cheats" | "timelines">("overview");
@@ -109,6 +101,17 @@ export function DashboardClient({
   const [savingRound, setSavingRound] = useState<number | null>(null);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState<string | null>(null);
+
+  const roundWinners = [1, 2, 3].map((round) => ({
+    round,
+    winner: leaderboardData.find((l) => l.round_id === round) || null,
+  }));
+
+  const [timelineRound, setTimelineRound] = useState<1 | 2 | 3>(1);
+
+  const roundLeaderboard = leaderboardData.filter(
+    (l) => l.round_id === timelineRound
+  );
 
   const handleDownloadCSV = () => {
     const parts: string[] = [];
@@ -160,16 +163,22 @@ export function DashboardClient({
       row([submitterEmail, ownerEmail, c.round_id, c.flag, c.status.toUpperCase(), formatTimestamp(c.detected_at)]);
     });
 
+    section("ROUND WINNERS");
+    row(["Round", "Winner", "Email", "Time", "Flag"]);
+    roundWinners.forEach(({ round, winner }) =>
+      row([
+        round,
+        winner?.users?.name || "Not won yet",
+        winner?.users?.email || "",
+        winner ? formatTimestamp(winner.submitted_at) : "",
+        winner?.flag || "",
+      ])
+    );
+
     section("LEADERBOARD (CORRECT FLAGS)");
     row(["Rank", "User", "Round", "Time", "Flag"]);
     leaderboardData.forEach((l, index) =>
       row([index + 1, l.users?.email || "Unknown", l.round_id, formatTimestamp(l.submitted_at), l.flag])
-    );
-
-    section("TIMELINE SUBMISSIONS (ROUND 3)");
-    row(["User", "Round", "Time", "Content"]);
-    timelineSubmissions.forEach((t) =>
-      row([t.users?.email || "Unknown", t.round_id, formatTimestamp(t.submitted_at), t.content])
     );
 
     const blob = new Blob(["\uFEFF" + parts.join("\n")], { type: "text/csv;charset=utf-8;" });
@@ -650,74 +659,54 @@ export function DashboardClient({
         )}
 
         {activeTab === "timelines" && (
-          <div className="space-y-8">
-            <div>
-              <h2 className="font-pixel text-base text-[#00ff41] mb-4">
-                CORRECT FLAG SUBMISSIONS (LEADERBOARD)
-              </h2>
-              {leaderboardData.length === 0 ? (
-                <div className="font-terminal text-[#666] text-center py-8">
-                  No correct flags submitted yet.
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full font-terminal text-base">
-                    <thead>
-                      <tr className="border-b border-[#1a472a]">
-                        <th className="text-left py-2 text-[#666]">Rank</th>
-                        <th className="text-left py-2 text-[#666]">User</th>
-                        <th className="text-left py-2 text-[#666]">Round</th>
-                        <th className="text-left py-2 text-[#666]">Time</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {leaderboardData.map((l, idx) => (
-                        <tr key={l.id} className="border-b border-[#1a472a]/50">
-                          <td className="py-2 text-[#ffb000]">#{idx + 1}</td>
-                          <td className="py-2 text-[#00ff41]">
-                            {l.users?.name ? `${l.users.name} (${l.users.email})` : l.users?.email || "Unknown"}
-                          </td>
-                          <td className="py-2 text-[#ffb000]">Round {l.round_id}</td>
-                          <td className="py-2 text-[#666]">{formatTimestamp(l.submitted_at)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+          <div>
+            <h2 className="font-pixel text-base text-[#00ff41] mb-4">
+              ROUND LEADERBOARD
+            </h2>
+
+            <div className="flex gap-2 mb-6 flex-wrap">
+              {([1, 2, 3] as const).map((round) => (
+                <button
+                  key={round}
+                  onClick={() => setTimelineRound(round)}
+                  className={`pixel-btn text-sm ${timelineRound === round
+                      ? "bg-[#00ff41] text-black font-bold"
+                      : "bg-[#1a472a] text-[#00ff41]"
+                    }`}
+                >
+                  ROUND {round}
+                </button>
+              ))}
             </div>
 
-            <div>
-              <h2 className="font-pixel text-base text-[#00ff41] mb-4">
-                INCIDENT TIMELINE SUBMISSIONS (ROUND 3)
-              </h2>
-              {timelineSubmissions.length === 0 ? (
-                <div className="font-terminal text-[#666] text-center py-8">
-                  No timeline submissions yet.
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {timelineSubmissions.map((t) => (
-                    <div
-                      key={t.id}
-                      className="border border-[#1a472a] p-4"
-                    >
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="font-pixel text-sm text-[#00ff41]">
-                          {t.users?.email || "Unknown"}
-                        </span>
-                        <span className="font-terminal text-sm text-[#666]">
-                          {formatTimestamp(t.submitted_at)}
-                        </span>
-                      </div>
-                      <pre className="font-terminal text-base text-[#ffb000] whitespace-pre-wrap">
-                        {t.content}
-                      </pre>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            {roundLeaderboard.length === 0 ? (
+              <div className="font-terminal text-[#666] text-center py-8">
+                No correct flags submitted for Round {timelineRound} yet.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full font-terminal text-base">
+                  <thead>
+                    <tr className="border-b border-[#1a472a]">
+                      <th className="text-left py-2 text-[#666]">Rank</th>
+                      <th className="text-left py-2 text-[#666]">User</th>
+                      <th className="text-left py-2 text-[#666]">Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {roundLeaderboard.map((l, idx) => (
+                      <tr key={l.id} className="border-b border-[#1a472a]/50">
+                        <td className="py-2 text-[#ffb000]">#{idx + 1}</td>
+                        <td className="py-2 text-[#00ff41]">
+                          {l.users?.name ? `${l.users.name} (${l.users.email})` : l.users?.email || "Unknown"}
+                        </td>
+                        <td className="py-2 text-[#666]">{formatTimestamp(l.submitted_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </div>

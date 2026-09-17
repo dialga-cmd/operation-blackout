@@ -142,31 +142,6 @@ export default async function DashboardPage() {
     console.error("Failed to fetch dashboard cheat attempts:", cheatAttemptsError);
   }
 
-  // Get timeline submissions
-  const { data: timelineSubmissions, error: timelineError } = await adminSupabase
-    .from("timeline_submissions")
-    .select(`
-      *,
-      users:user_id (email, name)
-    `)
-    .order("submitted_at", { ascending: false });
-  if (timelineError) {
-    console.error("Failed to fetch dashboard timeline submissions:", timelineError);
-  }
-
-  const formattedTimelineSubmissions = (timelineSubmissions || []).map((submission) => ({
-    id: submission.id,
-    content: submission.content,
-    submitted_at: submission.submitted_at,
-    round_id: submission.round_id,
-    users: submission.users
-      ? {
-          email: submission.users.email || "",
-          name: submission.users.name || "",
-        }
-      : undefined,
-  }));
-
   // Stats calculation
   const totalUsers = formattedUsers.length;
 
@@ -245,7 +220,6 @@ export default async function DashboardPage() {
       allProgress={formattedProgress}
       allAttempts={formattedAttempts}
       cheatAttempts={cheatAttempts || []}
-      timelineSubmissions={formattedTimelineSubmissions}
       leaderboardData={formattedLeaderboard}
     />
   );
