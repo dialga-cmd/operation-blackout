@@ -6,6 +6,7 @@ import { UserProgress, Round } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 import { PixelLock, PixelUnlock, PixelProgressSprite, PixelSoldier } from "@/components/pixel-art";
 import { StoryReveal } from "@/components/story/StoryReveal";
+import { EventBriefing } from "@/components/info/EventBriefing";
 import { storyChapters } from "@/data/story";
 
 interface DaySelectionProps {
@@ -17,6 +18,7 @@ export function DaySelectionClient({ progress, rounds }: DaySelectionProps) {
   const router = useRouter();
   const [now, setNow] = useState<number>(0);
   const [activeStory, setActiveStory] = useState<number | null>(null);
+  const [showBriefing, setShowBriefing] = useState<boolean>(false);
 
   useEffect(() => {
     setNow(Date.now());
@@ -200,7 +202,13 @@ export function DaySelectionClient({ progress, rounds }: DaySelectionProps) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[1, 2, 3].map(renderBox)}
         </div>
-        <div className="mt-12 text-center">
+        <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
+          <button
+            onClick={() => setShowBriefing(true)}
+            className="pixel-btn text-xs bg-[#1a472a] text-[#00ff41] border border-[#00ff41]/50 px-4 py-2 hover:bg-[#00ff41] hover:text-black"
+          >
+            EVENT BRIEFING
+          </button>
           <button
             onClick={() => {
               createClient().auth.signOut().then(() => {
@@ -218,6 +226,7 @@ export function DaySelectionClient({ progress, rounds }: DaySelectionProps) {
     {activeChapter && (
       <StoryReveal chapter={activeChapter} onComplete={() => setActiveStory(null)} />
     )}
+    {showBriefing && <EventBriefing onClose={() => setShowBriefing(false)} />}
     </>
   );
 }
