@@ -154,11 +154,11 @@ create policy "Users can insert own timelines"
   on public.timeline_submissions for insert
   with check (auth.uid() = user_id);
 
--- Auto-create user profile on signup
+-- Auto-create user profile on signup (only for authorized .iitm.ac.in emails)
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
-  if new.email like '%.iitm.ac.in' then
+  if new.email is not null and lower(new.email) like '%.iitm.ac.in' then
     insert into public.users (id, email, name, avatar_url)
     values (
       new.id,
