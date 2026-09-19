@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "verify:puzzles": "tsx scripts/verify-puzzles.ts"
+    "verify:puzzles": "tsx scripts/verify-puzzles.ts",
+    "restore:scores": "tsx scripts/restore-scores.ts",
+    "cleanup:reattempts": "tsx scripts/delete-reattempts.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.5",

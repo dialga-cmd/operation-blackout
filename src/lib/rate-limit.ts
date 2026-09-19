@@ -53,6 +53,5 @@ export function checkRateLimit(
 export const RATE_LIMITS = {
   flagValidate: { windowMs: 60_000, maxRequests: 20 },
   vfsFetch: { windowMs: 60_000, maxRequests: 30 },
-  timeline: { windowMs: 60_000, maxRequests: 10 },
   default: { windowMs: 60_000, maxRequests: 60 },
 } as const;

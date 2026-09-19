@@ -68,15 +68,6 @@ create table if not exists public.cheat_attempts (
   status text default 'flagged' check (status in ('banned', 'flagged'))
 );
 
--- Timeline submissions (Round 3)
-create table if not exists public.timeline_submissions (
-  id uuid primary key default uuid_generate_v4(),
-  user_id uuid references public.users(id) on delete cascade,
-  round_id integer references public.rounds(id),
-  content text not null,
-  submitted_at timestamptz default now()
-);
-
 -- Insert default rounds
 insert into public.rounds (number, title, unlock_date, is_active, max_score)
 values
@@ -91,7 +82,6 @@ alter table public.user_progress enable row level security;
 alter table public.flag_attempts enable row level security;
 alter table public.user_flag_keys enable row level security;
 alter table public.cheat_attempts enable row level security;
-alter table public.timeline_submissions enable row level security;
 alter table public.rounds enable row level security;
 
 -- (If admins table exists, enable RLS for it as well)
@@ -145,14 +135,6 @@ create policy "Users can view own cheat attempts"
 create policy "Users can insert cheat attempts"
   on public.cheat_attempts for insert
   with check (true);
-
-create policy "Users can view own timelines"
-  on public.timeline_submissions for select
-  using (auth.uid() = user_id);
-
-create policy "Users can insert own timelines"
-  on public.timeline_submissions for insert
-  with check (auth.uid() = user_id);
 
 -- Auto-create user profile on signup (only for authorized .iitm.ac.in emails)
 create or replace function public.handle_new_user()

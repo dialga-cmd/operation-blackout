@@ -105,11 +105,3 @@ export interface CheatAttempt {
   ip: string | null;
   status: "banned" | "flagged";
 }
-
-export interface TimelineSubmission {
-  id: string;
-  user_id: string;
-  round_id: number;
-  content: string;
-  submitted_at: string;
-}

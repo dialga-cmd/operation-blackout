@@ -105,7 +105,6 @@ export function executeCommand(
           "  id, groups, env, history",
           "  sudo, clear, help, whoami",
           "  submit <FLAG{...}> — Submit your flag",
-          "  timeline <summary> — Submit Round 3 investigation timeline",
           "",
           "Type 'help' for this message.",
         ].join("\n"),

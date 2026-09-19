@@ -188,15 +188,23 @@ export default async function DashboardPage() {
     console.error("Failed to fetch correct flags:", correctFlagsError);
   }
 
-  // Filter out banned users
+  // Filter out banned users and keep only the FIRST (earliest) correct
+  // attempt per user+round so re-submissions never show duplicate names.
   const bannedUserIds = new Set<string>();
   (cheatAttempts || []).forEach(c => {
     bannedUserIds.add(c.submitter_id);
     bannedUserIds.add(c.owner_id);
   });
 
+  const firstAttemptKeys = new Set<string>();
   const formattedLeaderboard = (correctFlags || [])
     .filter(a => !bannedUserIds.has(a.user_id))
+    .filter(a => {
+      const key = `${a.user_id}:${a.round_id}`;
+      if (firstAttemptKeys.has(key)) return false;
+      firstAttemptKeys.add(key);
+      return true;
+    })
     .map((a) => ({
       id: a.id,
       flag: a.flag,

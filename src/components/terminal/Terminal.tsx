@@ -90,55 +90,6 @@ export function Terminal({ roundData, roundId, userId, onFlagSubmit }: TerminalP
       return;
     }
 
-    // Handle timeline command
-    if (input.trim().toLowerCase().startsWith("timeline")) {
-      const content = input.trim().slice("timeline".length).trim();
-      if (!content) {
-        setTerminalHistory((prev) => [
-          ...prev,
-          {
-            id: entryId,
-            prompt: currentPrompt,
-            command: input,
-            output: "\x1b[1;33mUsage: timeline <4-6 line investigation summary; use Shift+Enter between lines>\x1b[0m",
-          },
-        ]);
-        return;
-      }
-      setIsProcessing(true);
-      try {
-        const res = await fetch("/api/timeline", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ roundId, userId, content }),
-        });
-        const data = await res.json();
-        setTerminalHistory((prev) => [
-          ...prev,
-          {
-            id: entryId,
-            prompt: currentPrompt,
-            command: input,
-            output: data.success
-              ? `\x1b[1;32m${data.message}\x1b[0m`
-              : `\x1b[1;31m${data.message || "Failed to submit timeline."}\x1b[0m`,
-          },
-        ]);
-      } catch {
-        setTerminalHistory((prev) => [
-          ...prev,
-          {
-            id: entryId,
-            prompt: currentPrompt,
-            command: input,
-            output: "\x1b[1;31mERROR: Timeline submission failed.\x1b[0m",
-          },
-        ]);
-      }
-      setIsProcessing(false);
-      return;
-    }
-
     // Handle submit command
     if (input.trim().startsWith("submit ")) {
       const flag = input.trim().slice(7).trim();

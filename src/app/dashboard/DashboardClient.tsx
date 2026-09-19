@@ -66,7 +66,22 @@ function formatTimestamp(value: string | null | undefined) {
   if (!value) return "-";
 
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "-" : date.toISOString().replace("T", " ").replace(".000Z", " UTC");
+  if (Number.isNaN(date.getTime())) return "-";
+
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+
+  const field = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+
+  return `${field("year")}-${field("month")}-${field("day")} ${field("hour")}:${field("minute")}:${field("second")} IST`;
 }
 
 function formatDate(value: string | null | undefined) {
@@ -660,8 +675,8 @@ export function DashboardClient({
 
         {activeTab === "timelines" && (
           <div>
-            <h2 className="font-pixel text-base text-[#00ff41] mb-4">
-              ROUND LEADERBOARD
+            <h2 className="font-pixel text-base text-[#ffb000] mb-4">
+              ROUND WINNERS (CORRECT FLAG LEADERBOARD)
             </h2>
 
             <div className="flex gap-2 mb-6 flex-wrap">
@@ -690,7 +705,7 @@ export function DashboardClient({
                     <tr className="border-b border-[#1a472a]">
                       <th className="text-left py-2 text-[#666]">Rank</th>
                       <th className="text-left py-2 text-[#666]">User</th>
-                      <th className="text-left py-2 text-[#666]">Time</th>
+                      <th className="text-left py-2 text-[#666]">Time (IST)</th>
                     </tr>
                   </thead>
                   <tbody>

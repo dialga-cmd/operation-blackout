@@ -38,13 +38,6 @@ export function executePipeline(
       };
     }
 
-    if (cmd.cmd === "timeline") {
-      return {
-        output: `timeline ${cmd.args.join(" ")}`,
-        session: newSession,
-      };
-    }
-
     const pipedInput = currentInput;
 
     if (cmd.cmd === "sudo") {

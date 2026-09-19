@@ -20,7 +20,7 @@
 ### 3. **Organizer Dashboard (`/dashboard`)**
 - **Database-Driven Admin Auth:** Checks the Supabase `admins` table & user roles (`admin` vs `participant`).
 - **Round Unlock Scheduler:** Set custom unlock dates, times, and toggles (**ACTIVE** / **LOCKED**).
-- **Participant Live Progress:** Monitor completed rounds, flag submission history, timeline reports, and cheat alerts in real time.
+- **Participant Live Progress:** Monitor completed rounds, flag submission history, and cheat alerts in real time.
 
 ---
 
@@ -35,8 +35,8 @@
 - **Mechanics:** Inspect `/etc/cron.d/fake-job` and symlink targets (`/opt/scripts/monitor.sh`). Reassemble 3-part split flags (`auth_session.part1`, `part2`, `part3`) encoded across environment variables and ROT13/Base64 history logs.
 
 ### **Round 3 (HARDEST): Binary Analysis & Hex Memory Forensics**
-- **Objective:** Extract attacker payloads and submit an incident report.
-- **Mechanics:** Detect magic-byte disguised files (`invoice.pdf` is actually a GZIP/TAR archive containing an ELF binary). Run `strings` or `xxd` to extract hex-encoded stash targets (`2f766172...`), perform elevated `sudo -l` inspections, and submit the required incident report via `timeline`.
+- **Objective:** Extract attacker payloads and submit the flag.
+- **Mechanics:** Detect magic-byte disguised files (`invoice.pdf` is actually a GZIP/TAR archive containing an ELF binary). Run `strings` or `xxd` to extract hex-encoded stash targets (`2f766172...`), perform elevated `sudo -l` inspections, and submit the final flag.
 
 ---
 
