@@ -219,6 +219,35 @@ export default async function DashboardPage() {
         : undefined,
     }));
 
+  // Score-based leaderboard (highest points first) for initial render
+  const formattedScoreLeaderboard = (formattedProgress || [])
+    .filter(
+      (p) =>
+        p.status === "completed" &&
+        typeof p.score === "number" &&
+        !bannedUserIds.has(p.user_id)
+    )
+    .map((p) => ({
+      user_id: p.user_id,
+      round_id: p.round_id,
+      status: p.status,
+      score: p.score,
+      started_at: p.started_at,
+      completed_at: p.completed_at,
+      users: p.users
+        ? {
+            email: p.users.email || "",
+            name: p.users.name || "",
+          }
+        : undefined,
+    }))
+    .sort(
+      (a, b) =>
+        (b.score ?? 0) - (a.score ?? 0) ||
+        new Date(a.completed_at || 0).getTime() -
+          new Date(b.completed_at || 0).getTime()
+    );
+
   return (
     <DashboardClient
       totalUsers={totalUsers}
@@ -229,6 +258,7 @@ export default async function DashboardPage() {
       allAttempts={formattedAttempts}
       cheatAttempts={cheatAttempts || []}
       leaderboardData={formattedLeaderboard}
+      scoreLeaderboardData={formattedScoreLeaderboard}
     />
   );
 }

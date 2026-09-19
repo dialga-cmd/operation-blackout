@@ -60,6 +60,15 @@ interface DashboardProps {
     user_id: string;
     users?: { email: string; name: string };
   }>;
+  scoreLeaderboardData: Array<{
+    user_id: string;
+    round_id: number;
+    status: string;
+    score: number | null;
+    started_at: string | null;
+    completed_at: string | null;
+    users?: { email: string; name: string };
+  }>;
 }
 
 function formatTimestamp(value: string | null | undefined) {
@@ -110,12 +119,16 @@ export function DashboardClient({
   allAttempts,
   cheatAttempts,
   leaderboardData,
+  scoreLeaderboardData,
 }: DashboardProps) {
-  const [activeTab, setActiveTab] = useState<"overview" | "schedule" | "users" | "attempts" | "cheats" | "timelines">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "schedule" | "users" | "attempts" | "cheats" | "timelines" | "leaderboard">("overview");
   const [rounds, setRounds] = useState(initialRoundsList);
   const [savingRound, setSavingRound] = useState<number | null>(null);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState<string | null>(null);
+  const [scoreLeaderboard, setScoreLeaderboard] = useState(scoreLeaderboardData);
+  const [leaderboardRound, setLeaderboardRound] = useState<1 | 2 | 3>(1);
+  const [leaderboardUpdatedAt, setLeaderboardUpdatedAt] = useState<string | null>(null);
 
   const roundWinners = [1, 2, 3].map((round) => ({
     round,
@@ -127,6 +140,42 @@ export function DashboardClient({
   const roundLeaderboard = leaderboardData.filter(
     (l) => l.round_id === timelineRound
   );
+
+  const roundScoreLeaderboard = scoreLeaderboard
+    .filter((l) => l.round_id === leaderboardRound)
+    .sort(
+      (a, b) =>
+        (b.score ?? 0) - (a.score ?? 0) ||
+        new Date(a.completed_at || 0).getTime() -
+          new Date(b.completed_at || 0).getTime()
+    );
+
+  const handleDownloadLeaderboardCSV = () => {
+    const parts: string[] = [];
+    const section = (title: string) => parts.push(`\n===== ${title} =====\n`);
+    const row = (cells: unknown[]) => parts.push(cells.map(csvEscape).join(","));
+
+    section(`SCORE LEADERBOARD (ROUND ${leaderboardRound})`);
+    row(["Rank", "User", "Score", "Completed At (IST)"]);
+    roundScoreLeaderboard.forEach((l, index) =>
+      row([
+        index + 1,
+        l.users?.name ? `${l.users.name} (${l.users.email})` : l.users?.email || "Unknown",
+        l.score ?? "",
+        formatTimestamp(l.completed_at),
+      ])
+    );
+
+    const blob = new Blob(["\uFEFF" + parts.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `operation_blackout_round${leaderboardRound}_leaderboard_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   const handleDownloadCSV = () => {
     const parts: string[] = [];
@@ -196,6 +245,25 @@ export function DashboardClient({
       row([index + 1, l.users?.email || "Unknown", l.round_id, formatTimestamp(l.submitted_at), l.flag])
     );
 
+    section("SCORE LEADERBOARD (HIGHEST POINTS)");
+    row(["Rank", "User", "Round", "Score", "Completed At"]);
+    [...scoreLeaderboard]
+      .sort(
+        (a, b) =>
+          (b.score ?? 0) - (a.score ?? 0) ||
+          new Date(a.completed_at || 0).getTime() -
+            new Date(b.completed_at || 0).getTime()
+      )
+      .forEach((l, index) =>
+        row([
+          index + 1,
+          l.users?.name ? `${l.users.name} (${l.users.email})` : l.users?.email || "Unknown",
+          l.round_id,
+          l.score ?? "",
+          formatTimestamp(l.completed_at),
+        ])
+      );
+
     const blob = new Blob(["\uFEFF" + parts.join("\n")], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -213,6 +281,28 @@ export function DashboardClient({
     updateTime();
     const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchLeaderboard = async () => {
+      try {
+        const res = await fetch("/api/admin/leaderboard", { cache: "no-store" });
+        const data = await res.json();
+        if (!cancelled && data.success && Array.isArray(data.data)) {
+          setScoreLeaderboard(data.data);
+          setLeaderboardUpdatedAt(new Date().toLocaleTimeString());
+        }
+      } catch {
+        // Keep showing the previous snapshot if a refresh fails.
+      }
+    };
+    fetchLeaderboard();
+    const interval = setInterval(fetchLeaderboard, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
   const handleUpdateRoundSchedule = async (roundNumber: number, unlockDate: string, isActive: boolean) => {
@@ -302,7 +392,7 @@ export function DashboardClient({
 
       {/* Tabs */}
       <div className="flex gap-2 mb-6 flex-wrap">
-        {(["overview", "schedule", "users", "attempts", "cheats", "timelines"] as const).map((tab) => (
+        {(["overview", "schedule", "users", "attempts", "cheats", "timelines", "leaderboard"] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -708,7 +798,7 @@ export function DashboardClient({
                       <th className="text-left py-2 text-[#666]">Time (IST)</th>
                     </tr>
                   </thead>
-                  <tbody>
+<tbody>
                     {roundLeaderboard.map((l, idx) => (
                       <tr key={l.id} className="border-b border-[#1a472a]/50">
                         <td className="py-2 text-[#ffb000]">#{idx + 1}</td>
@@ -716,6 +806,82 @@ export function DashboardClient({
                           {l.users?.name ? `${l.users.name} (${l.users.email})` : l.users?.email || "Unknown"}
                         </td>
                         <td className="py-2 text-[#666]">{formatTimestamp(l.submitted_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "leaderboard" && (
+          <div>
+            <div className="flex items-center justify-between flex-wrap gap-4 mb-4">
+              <h2 className="font-pixel text-base text-[#ffb000]">
+                SCORE LEADERBOARD (HIGHEST POINTS)
+              </h2>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleDownloadLeaderboardCSV}
+                  className="pixel-btn text-xs bg-[#ffb000] text-black font-bold py-2 px-4 hover:bg-[#ffc000]"
+                >
+                  EXPORT ROUND {leaderboardRound} CSV
+                </button>
+                <span className="font-terminal text-sm text-[#00ff41] flex items-center gap-2">
+                  <span className="inline-block w-2 h-2 bg-[#00ff41] rounded-full animate-pulse"></span>
+                  LIVE
+                  {leaderboardUpdatedAt ? ` · UPDATED ${leaderboardUpdatedAt}` : ""}
+                </span>
+              </div>
+            </div>
+            <p className="font-terminal text-sm text-[#666] mb-6">
+              Ranks players by score for the selected round — highest points first. Refreshes automatically every 5 seconds.
+            </p>
+
+            <div className="flex gap-2 mb-6 flex-wrap">
+              {([1, 2, 3] as const).map((round) => (
+                <button
+                  key={round}
+                  onClick={() => setLeaderboardRound(round)}
+                  className={`pixel-btn text-sm ${leaderboardRound === round
+                      ? "bg-[#00ff41] text-black font-bold"
+                      : "bg-[#1a472a] text-[#00ff41]"
+                    }`}
+                >
+                  ROUND {round}
+                </button>
+              ))}
+            </div>
+
+            {roundScoreLeaderboard.length === 0 ? (
+              <div className="font-terminal text-[#666] text-center py-8">
+                No completed scores submitted for Round {leaderboardRound} yet.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full font-terminal text-base">
+                  <thead>
+                    <tr className="border-b border-[#1a472a]">
+                      <th className="text-left py-2 text-[#666]">Rank</th>
+                      <th className="text-left py-2 text-[#666]">User</th>
+                      <th className="text-left py-2 text-[#666]">Score</th>
+                      <th className="text-left py-2 text-[#666]">Completed At (IST)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {roundScoreLeaderboard.map((l, idx) => (
+                      <tr key={`${l.user_id}-${l.round_id}`} className="border-b border-[#1a472a]/50">
+                        <td className="py-2 pr-4 text-lg text-[#ffb000] font-sans font-bold tabular-nums">
+                          #{idx + 1}
+                        </td>
+                        <td className="py-2 text-[#00ff41]">
+                          {l.users?.name ? `${l.users.name} (${l.users.email})` : l.users?.email || "Unknown"}
+                        </td>
+                        <td className="py-2 pr-4 text-xl text-[#00ff41] font-sans font-bold tabular-nums">
+                          {l.score ?? "-"}
+                        </td>
+                        <td className="py-2 text-[#666]">{formatTimestamp(l.completed_at)}</td>
                       </tr>
                     ))}
                   </tbody>
