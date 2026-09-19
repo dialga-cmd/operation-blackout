@@ -41,7 +41,7 @@ export async function POST(request: Request) {
 
     const supabase = createAdminClient();
 
-    const [banCheck, recentAttempts] = await Promise.all([
+    const [banCheck, recentAttempts, progressCheck] = await Promise.all([
       supabase
         .from("cheat_attempts")
         .select("status")
@@ -55,6 +55,12 @@ export async function POST(request: Request) {
         .eq("round_id", roundId)
         .order("submitted_at", { ascending: false })
         .limit(20),
+      supabase
+        .from("user_progress")
+        .select("id, status, started_at")
+        .eq("user_id", userId)
+        .eq("round_id", roundId)
+        .maybeSingle(),
     ]);
 
     if (banCheck.data) {
@@ -66,6 +72,16 @@ export async function POST(request: Request) {
         },
         { status: 403 }
       );
+    }
+
+    // A round can only be completed once — re-submitting must never lower a
+    // player's score, so block any further submission after completion.
+    if (progressCheck.data?.status === "completed") {
+      return NextResponse.json({
+        success: false,
+        message:
+          "ALREADY SUBMITTED: You have already submitted the flag for this round. You cannot submit the flag again.",
+      });
     }
 
     const now = Date.now();
@@ -188,12 +204,7 @@ export async function POST(request: Request) {
       });
     }
 
-    const { data: progress } = await supabase
-      .from("user_progress")
-      .select("id, started_at")
-      .eq("user_id", userId)
-      .eq("round_id", roundId)
-      .single();
+    const progress = progressCheck.data;
 
     if (progress) {
       const startedAt = new Date(progress.started_at || new Date());
