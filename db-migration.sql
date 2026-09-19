@@ -29,11 +29,17 @@ create policy "Users can insert own cheat attempts"
 -- ----------------------------------------------------------------------------
 -- 4) Remove the dead `user_flag_keys` table (never written by app code, but its
 --    RLS policies let users read/insert per-user flag keys — a latent leak).
+--    The table only exists on DBs created from the old schema, so guard it.
 -- ----------------------------------------------------------------------------
-drop policy if exists "Users can view own flag keys" on public.user_flag_keys;
-drop policy if exists "Users can insert own flag keys" on public.user_flag_keys;
-alter table public.user_flag_keys disable row level security;
-drop table if exists public.user_flag_keys;
+do $$
+begin
+  if to_regclass('public.user_flag_keys') is not null then
+    drop policy if exists "Users can view own flag keys" on public.user_flag_keys;
+    drop policy if exists "Users can insert own flag keys" on public.user_flag_keys;
+    alter table public.user_flag_keys disable row level security;
+    drop table if exists public.user_flag_keys;
+  end if;
+end $$;
 
 -- ----------------------------------------------------------------------------
 -- Verify the result (should return 4 rows: the read policies + the one
