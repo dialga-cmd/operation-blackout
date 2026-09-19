@@ -5,6 +5,10 @@ import { VFSEngine } from "@/lib/vfs/engine";
 import { executePipeline } from "@/lib/vfs/executor";
 import { SessionState, VFSRound } from "@/lib/types";
 import { PixelNarrator } from "@/components/pixel-art";
+import {
+  extractSecureMarkerPaths,
+  isSecureMarker,
+} from "@/lib/vfs/sensitive";
 
 interface TerminalProps {
   roundData: VFSRound;
@@ -57,6 +61,7 @@ export function Terminal({ roundData, roundId, userId, onFlagSubmit }: TerminalP
   const [isProcessing, setIsProcessing] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const outputRef = useRef<HTMLDivElement>(null);
+  const entryCounter = useRef(0);
 
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
@@ -80,7 +85,8 @@ export function Terminal({ roundData, roundId, userId, onFlagSubmit }: TerminalP
 
   const processCommand = async (input: string) => {
     const currentPrompt = getPrompt();
-    const entryId = Math.random().toString(36).substring(2, 9);
+    entryCounter.current += 1;
+    const entryId = `e${entryCounter.current}`;
 
     if (input.trim() === "") {
       setTerminalHistory((prev) => [
@@ -161,7 +167,45 @@ export function Terminal({ roundData, roundId, userId, onFlagSubmit }: TerminalP
       },
     ]);
 
+    if (result.output && isSecureMarker(result.output)) {
+      const paths = extractSecureMarkerPaths(result.output);
+      setTerminalHistory((prev) =>
+        prev.map((item) =>
+          item.id === entryId
+            ? { ...item, output: "[*] Fetching sensitive file..." }
+            : item
+        )
+      );
+
+      const contents: string[] = [];
+      for (const p of paths) {
+        const fetched = await fetchSensitiveContent(p);
+        contents.push(fetched !== null ? fetched : `[ACCESS DENIED] ${p}`);
+      }
+
+      setTerminalHistory((prev) =>
+        prev.map((item) =>
+          item.id === entryId ? { ...item, output: contents.join("\n") } : item
+        )
+      );
+    }
+
     setIsProcessing(false);
+  };
+
+  const fetchSensitiveContent = async (path: string): Promise<string | null> => {
+    try {
+      const res = await fetch("/api/vfs/content", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roundId, path }),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return typeof data.content === "string" ? data.content : null;
+    } catch {
+      return null;
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

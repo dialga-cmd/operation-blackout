@@ -74,6 +74,46 @@ export async function POST(request: Request) {
       );
     }
 
+    const { data: roundConfig } = await supabase
+      .from("rounds")
+      .select("is_active, unlock_date")
+      .eq("number", roundId)
+      .single();
+
+    if (!roundConfig) {
+      return NextResponse.json(
+        { success: false, message: "Invalid round." },
+        { status: 400 }
+      );
+    }
+
+    const unlocked =
+      !!roundConfig.is_active &&
+      new Date(roundConfig.unlock_date).getTime() <= Date.now();
+    if (!unlocked) {
+      return NextResponse.json(
+        { success: false, message: "ROUND LOCKED: This round is not unlocked yet." },
+        { status: 403 }
+      );
+    }
+
+    let roundReached = roundId === 1;
+    if (!roundReached) {
+      const { data: prevProgress } = await supabase
+        .from("user_progress")
+        .select("status")
+        .eq("user_id", userId)
+        .eq("round_id", roundId - 1)
+        .single();
+      roundReached = !!prevProgress && prevProgress.status === "completed";
+    }
+    if (!roundReached) {
+      return NextResponse.json(
+        { success: false, message: "ROUND LOCKED: Complete the previous round first." },
+        { status: 403 }
+      );
+    }
+
     // A round can only be completed once — re-submitting must never lower a
     // player's score, so block any further submission after completion.
     if (progressCheck.data?.status === "completed") {

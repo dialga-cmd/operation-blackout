@@ -45,17 +45,6 @@ create table if not exists public.flag_attempts (
   correct boolean not null
 );
 
--- User flag keys (for per-user dynamic flags)
-create table if not exists public.user_flag_keys (
-  id uuid primary key default uuid_generate_v4(),
-  user_id uuid references public.users(id) on delete cascade,
-  round_id integer references public.rounds(id),
-  key text not null,
-  day_date date not null,
-  created_at timestamptz default now(),
-  unique(user_id, round_id, day_date)
-);
-
 -- Cheat detection log
 create table if not exists public.cheat_attempts (
   id uuid primary key default uuid_generate_v4(),
@@ -80,7 +69,6 @@ on conflict (number) do nothing;
 alter table public.users enable row level security;
 alter table public.user_progress enable row level security;
 alter table public.flag_attempts enable row level security;
-alter table public.user_flag_keys enable row level security;
 alter table public.cheat_attempts enable row level security;
 alter table public.rounds enable row level security;
 
@@ -104,37 +92,19 @@ create policy "Users can view own progress"
   on public.user_progress for select
   using (auth.uid() = user_id);
 
-create policy "Users can insert own progress"
-  on public.user_progress for insert
-  with check (auth.uid() = user_id);
-
-create policy "Users can update own progress"
-  on public.user_progress for update
-  using (auth.uid() = user_id);
-
 create policy "Users can view own attempts"
   on public.flag_attempts for select
   using (auth.uid() = user_id);
-
-create policy "Users can insert own attempts"
-  on public.flag_attempts for insert
-  with check (auth.uid() = user_id);
-
-create policy "Users can view own flag keys"
-  on public.user_flag_keys for select
-  using (auth.uid() = user_id);
-
-create policy "Users can insert own flag keys"
-  on public.user_flag_keys for insert
-  with check (auth.uid() = user_id);
 
 create policy "Users can view own cheat attempts"
   on public.cheat_attempts for select
   using (auth.uid() = submitter_id or auth.uid() = owner_id);
 
-create policy "Users can insert cheat attempts"
+-- Progress and attempt writes are performed by the server (service role) so
+-- players can never forge completion, scores, or attempt history themselves.
+create policy "Users can insert own cheat attempts"
   on public.cheat_attempts for insert
-  with check (true);
+  with check (auth.uid() = submitter_id);
 
 -- Auto-create user profile on signup (only for authorized .iitm.ac.in emails)
 create or replace function public.handle_new_user()

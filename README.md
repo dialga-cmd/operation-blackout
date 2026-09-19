@@ -48,6 +48,7 @@ Create a `.env.local` file with your Supabase credentials:
 NEXT_PUBLIC_SUPABASE_URL=https://your-supabase-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+FLAG_KEY_SECRET=your-long-random-secret
 ADMIN_EMAILS=admin@example.com
 ```
 

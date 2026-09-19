@@ -1,10 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { GameClient } from "./GameClient";
 import { DaySelectionClient } from "./DaySelectionClient";
 
 export default async function GamePage({ searchParams }: { searchParams: Promise<{ day?: string }> }) {
   const supabase = await createClient();
+  const adminSupabase = createAdminClient();
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
@@ -69,14 +71,14 @@ export default async function GamePage({ searchParams }: { searchParams: Promise
     );
 
     if (!existingProgress) {
-      await supabase.from("user_progress").insert({
+      await adminSupabase.from("user_progress").insert({
         user_id: user.id,
         round_id: currentRound,
         status: "in_progress",
         started_at: new Date().toISOString(),
       });
     } else if (existingProgress.status === "available") {
-      await supabase
+      await adminSupabase
         .from("user_progress")
         .update({
           status: "in_progress",

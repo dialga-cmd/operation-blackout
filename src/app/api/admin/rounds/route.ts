@@ -43,11 +43,9 @@ export async function POST(request: Request) {
         .split(",")
         .map((e) => e.trim().toLowerCase())
         .filter(Boolean);
-      isAdmin =
-        adminEmails.length === 0 ||
-        (user.email
-          ? adminEmails.includes(user.email.toLowerCase())
-          : false);
+      if (adminEmails.length > 0 && user.email) {
+        isAdmin = adminEmails.includes(user.email.toLowerCase());
+      }
     }
 
     if (!isAdmin) {

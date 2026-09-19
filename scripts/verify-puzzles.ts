@@ -4,6 +4,12 @@ import { round1VFS, round2VFS, round3VFS } from "../src/data/rounds";
 import { generateFlagKey, getTodayDate } from "../src/lib/crypto/flag-key";
 import type { SessionState } from "../src/lib/types";
 
+try {
+  process.loadEnvFile(".env.local");
+} catch {
+  // .env.local not present — rely on environment variables (e.g. CI).
+}
+
 let passed = 0;
 let failed = 0;
 

@@ -5,6 +5,7 @@ import { randomizeRoundVFS } from "@/lib/vfs/randomizer";
 import { createClient } from "@/lib/supabase/server";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { getCachedVFS, setCachedVFS } from "@/lib/vfs-cache";
+import type { VFSRound, VFSNode } from "@/lib/types";
 
 export async function GET(
   request: Request,
@@ -63,6 +64,23 @@ export async function GET(
     }
   }
 
+  const { data: roundConfig } = await supabase
+    .from("rounds")
+    .select("is_active, unlock_date")
+    .eq("number", roundId)
+    .single();
+
+  if (!roundConfig) {
+    return NextResponse.json({ error: "Invalid round" }, { status: 404 });
+  }
+
+  const unlocked =
+    !!roundConfig.is_active &&
+    new Date(roundConfig.unlock_date).getTime() <= Date.now();
+  if (!unlocked) {
+    return NextResponse.json({ error: "Round locked" }, { status: 403 });
+  }
+
   const roundData = roundVFSMap[roundId];
   if (!roundData) {
     return NextResponse.json({ error: "Invalid round" }, { status: 404 });
@@ -72,7 +90,7 @@ export async function GET(
 
   const cached = getCachedVFS(userId, roundId, todayDate);
   if (cached) {
-    return NextResponse.json(cached);
+    return NextResponse.json(sanitizeVFSForClient(cached));
   }
 
   const flagKey = generateFlagKey(userId, roundId, todayDate);
@@ -80,5 +98,32 @@ export async function GET(
 
   setCachedVFS(userId, roundId, todayDate, personalizedRound);
 
-  return NextResponse.json(personalizedRound);
+  return NextResponse.json(sanitizeVFSForClient(personalizedRound));
+}
+
+type SanitizableNode = Partial<VFSNode> & {
+  archiveContents?: SanitizableNode[];
+};
+
+// Remove real flag content before it reaches the browser. The client never
+// displays a solution flag directly — the terminal resolves a marker through
+// the gated /api/vfs/content endpoint instead.
+function sanitizeVFSForClient(round: VFSRound): VFSRound {
+  const strip = (node: VFSNode): VFSNode => {
+    const next: SanitizableNode = { ...node };
+    if (next.isSolutionFlag) {
+      next.content = "";
+      next.readableStrings = undefined;
+      next.archiveContents = undefined;
+    } else if (Array.isArray(next.archiveContents)) {
+      next.archiveContents = next.archiveContents.map(strip);
+    }
+    return next as VFSNode;
+  };
+
+  const cleaned = { ...round };
+  if (Array.isArray(cleaned.nodes)) {
+    cleaned.nodes = cleaned.nodes.map(strip);
+  }
+  return cleaned;
 }

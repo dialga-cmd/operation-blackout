@@ -1,11 +1,13 @@
 import { CommandResult, VFSNode } from "../../types";
 import { VFSEngine } from "../engine";
+import { buildSecureMarker } from "../sensitive";
 
-const ROUND3_FLAG_PREFIX = "FLAG{the_trace_that_remained_";
-
+// Round 3's flag file keeps its isSolutionFlag marking even after the server
+// strips its content, so the survival command can follow the real stash dir
+// without reading flag content.
 function findRound3Stash(vfs: VFSEngine): string {
   const flagFile = (vfs.getRound().nodes || []).find(
-    (n) => n.type === "file" && n.content && n.content.startsWith(ROUND3_FLAG_PREFIX)
+    (n) => n.type === "file" && n.isSolutionFlag
   );
   if (flagFile) {
     const idx = flagFile.path.lastIndexOf("/");
@@ -70,7 +72,7 @@ export function executeCommand(
     case "file":
       return handleFile(args, vfs, cwd);
     case "strings":
-      return handleStrings(args, vfs, cwd);
+      return handleStrings(args, vfs, cwd, currentUser);
     case "tar":
     case "gzip":
     case "unzip":
@@ -245,6 +247,12 @@ function handleCat(
       output: `cat: ${target}: Permission denied`,
       error: true,
     };
+  }
+
+  // Solution flags never flow through the client. When content was stripped
+  // server-side, the terminal resolves the marker via the gated endpoint.
+  if (targetNode.isSolutionFlag && !targetNode.content) {
+    return { output: buildSecureMarker(targetNode.path) };
   }
 
   return { output: targetNode.content || "" };
@@ -609,7 +617,8 @@ function handleFile(
 function handleStrings(
   args: string[],
   vfs: VFSEngine,
-  cwd: string
+  cwd: string,
+  currentUser: string
 ): CommandResult {
   const target = args.find((a) => !a.startsWith("-"));
   if (!target) {
@@ -624,6 +633,14 @@ function handleStrings(
       output: `strings: '${target}': No such file or directory`,
       error: true,
     };
+  }
+
+  // Solution flags and unreadable files must never be dumped by strings.
+  if (node.type === "file") {
+    const userGroups = getUserGroups(currentUser);
+    if (node.isSolutionFlag || !vfs.canRead(node, currentUser, userGroups)) {
+      return { output: "" };
+    }
   }
 
   if (node.readableStrings && node.readableStrings.length > 0) {

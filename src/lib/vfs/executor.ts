@@ -3,12 +3,12 @@ import { parseInput } from "./parser";
 import { executeCommand } from "./commands";
 import { SessionState, CommandResult } from "../types";
 
-const ROUND3_FLAG_PREFIX = "FLAG{the_trace_that_remained_";
-
+// Round 3's flag file is marked isSolutionFlag (even after the server strips
+// its content), so the stash dir can be derived without reading flag content.
 function getRound3StashDir(vfs: VFSEngine): string | null {
   const round = vfs.getRound();
   const flagFile = (round.nodes || []).find(
-    (n) => n.type === "file" && n.content && n.content.startsWith(ROUND3_FLAG_PREFIX)
+    (n) => n.type === "file" && n.isSolutionFlag
   );
   if (!flagFile) return null;
   const idx = flagFile.path.lastIndexOf("/");
