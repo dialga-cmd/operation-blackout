@@ -41,10 +41,17 @@ function personalize(round: number, nodes: VFSNode[], userId: string): VFSNode[]
   const key = generateFlagKey(userId, round, getTodayDate());
   return nodes.map((node) => {
     if (round === 2 && node.path === "/var/log/.archive/staging_part1.txt") {
-      return { ...node, content: `FLAG{hidden_in_pl${key}` };
+      return { ...node, content: `FLAG{hidden_in_pl${key}`, isSolutionFlag: true };
     }
     if (node.content && node.content.startsWith("FLAG{") && node.content.endsWith("}")) {
-      return { ...node, content: node.content.slice(0, -1) + `_${key}}` };
+      const isReal =
+        (round === 1 && node.content.includes("the_attacker_did_not_choose_randomly")) ||
+        (round === 3 && node.content.includes("the_trace_that_remained"));
+      return {
+        ...node,
+        content: node.content.slice(0, -1) + `_${key}}`,
+        ...(isReal ? { isSolutionFlag: true } : {}),
+      };
     }
     return node;
   });
@@ -98,6 +105,16 @@ async function main() {
   const r1LsOwner = parse("ls -la /var/backups/.svc_archive/", vfs1, s1);
   check("ls -la shows real flag owned by svc-backup", /\bflag\.txt\b/.test(r1LsOwner) && r1LsOwner.includes("svc-backup"), r1LsOwner);
 
+  // grep must never leak the real flag — decoys and logs only
+  const r1GrepReal = parse('grep -r "the_attacker_did_not_choose_randomly" /', vfs1, s1);
+  check("grep does not leak real flag", r1GrepReal === "", r1GrepReal);
+  const r1GrepDecoy = parse('grep -r "FLAG" /', vfs1, s1);
+  check(
+    "grep shows decoys only",
+    r1GrepDecoy.includes("the_server_was_compromised") && !r1GrepDecoy.includes("the_attacker_did_not_choose_randomly"),
+    r1GrepDecoy
+  );
+
   console.log("\n=== ROUND 2: What They Tried to Hide ===\n");
   const r2User = personalize(2, round2VFS.nodes, userId);
   const vfs2 = new VFSEngine({ ...round2VFS, nodes: r2User });
@@ -133,6 +150,12 @@ async function main() {
   const r2Key = generateFlagKey(userId, 2, getTodayDate());
   check("part1 has FLAG+key", r2Part1 === `FLAG{hidden_in_pl${r2Key}`, r2Part1);
   check("part2 has suffix", r2Part2 === "ain_permissions}", r2Part2);
+
+  // grep respects permissions (shadow.bak is chmod 000) and hides the flag part
+  const r2GrepLocked = parse('grep -r "hashedpasswordhere" /etc', vfs2, s2);
+  check("grep respects file permissions", r2GrepLocked === "", r2GrepLocked);
+  const r2GrepReal = parse('grep -r "hidden_in_pl" /', vfs2, s2);
+  check("grep does not leak round 2 flag part", r2GrepReal === "", r2GrepReal);
 
   console.log("\n=== ROUND 3: The Last Trace ===\n");
   const r3User = personalize(3, round3VFS.nodes, userId);
@@ -188,6 +211,20 @@ async function main() {
   const r3Final = parse("sudo cat /var/log/.final_stash/final_flag.txt", vfs3, s3);
   const r3Key = generateFlagKey(userId, 3, getTodayDate());
   check("final flag via sudo cat", r3Final.includes(`the_trace_that_remained_${r3Key}`), r3Final);
+
+  // grep must never leak round 3's flag (even though sudo elevates for cat)
+  const r3GrepReal = parse('grep -r "the_trace_that_remained" /', vfs3, s3);
+  check("grep does not leak round 3 flag", r3GrepReal === "", r3GrepReal);
+  const r3GrepDecoy = parse('grep -r "FLAG" /', vfs3, s3);
+  check(
+    "grep shows decoys only (round 3)",
+    r3GrepDecoy.includes("correlated_logs_reveal_everything") && !r3GrepDecoy.includes("the_trace_that_remained"),
+    r3GrepDecoy
+  );
+
+  // piped stdin is grepped instead of scanning the cwd
+  const r3Pipe = parse('cat /var/log/.incidents/auth_trace.log | grep "03:45"', vfs3, s3);
+  check("piped grep uses stdin", r3Pipe.includes("03:45:00 svc-unknown DEPLOY"), r3Pipe);
 
   console.log(`\n===== RESULT: ${passed} passed, ${failed} failed =====\n`);
   process.exit(failed > 0 ? 1 : 0);

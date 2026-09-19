@@ -110,15 +110,31 @@ export class VFSEngine {
     pattern: string,
     startPath: string = "/",
     recursive: boolean = false,
-    extendedRegex: boolean = false
+    extendedRegex: boolean = false,
+    canAccessFile?: (node: VFSNode) => boolean
   ): { node: VFSNode; matches: string[] }[] {
     const results: { node: VFSNode; matches: string[] }[] = [];
     const regex = new RegExp(pattern, extendedRegex ? "g" : "gi");
 
+    const startNode = this.nodes.get(startPath);
+
     for (const [, node] of this.nodes) {
       if (node.type !== "file" || !node.content) continue;
-      if (!recursive && !node.path.startsWith(startPath)) continue;
-      if (recursive && !node.path.startsWith(startPath)) continue;
+      if (node.isSolutionFlag) continue;
+      if (canAccessFile && !canAccessFile(node)) continue;
+
+      // A single file target is grepped directly; directories are recursed
+      // only with -r (matching real grep semantics).
+      if (startNode && startNode.type === "file") {
+        if (node.path !== startPath) continue;
+      } else {
+        if (!node.path.startsWith(startPath)) continue;
+        if (!recursive) {
+          const prefix = startPath.endsWith("/") ? startPath : startPath + "/";
+          const remainder = node.path.slice(prefix.length);
+          if (remainder.includes("/")) continue;
+        }
+      }
 
       const lines = node.content.split("\n");
       const matches: string[] = [];

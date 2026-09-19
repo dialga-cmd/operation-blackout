@@ -112,6 +112,7 @@ WARNING: Permission check required! Owned by group 'backup' (use id/groups).`,
           ...node,
           path: realFlagPath,
           content: `FLAG{the_attacker_did_not_choose_randomly_${flagKey}}`,
+          isSolutionFlag: true,
         });
         continue;
       }
@@ -189,6 +190,7 @@ echo "DECOY_WARNING: Avoid false triggers in /var/log/.correlated"`,
           ...node,
           path: `${targetDir}/${part1Name}`,
           content: `FLAG{hidden_in_pl`,
+          isSolutionFlag: true,
         });
         continue;
       }
@@ -198,6 +200,7 @@ echo "DECOY_WARNING: Avoid false triggers in /var/log/.correlated"`,
           ...node,
           path: `${targetDir}/${part2Name}`,
           content: `${flagKey}`,
+          isSolutionFlag: true,
         });
         continue;
       }
@@ -213,6 +216,7 @@ echo "DECOY_WARNING: Avoid false triggers in /var/log/.correlated"`,
           mtime: "2026-01-14T02:19:45Z",
           size: 18,
           inode: 2001013,
+          isSolutionFlag: true,
         });
         nodes.push({
           path: `${targetDir}/${decoy1Name}`,
@@ -314,6 +318,7 @@ echo "DECOY_WARNING: Avoid false triggers in /var/log/.correlated"`,
           ...node,
           path: realFlagFile,
           content: `FLAG{the_trace_that_remained_${flagKey}}`,
+          isSolutionFlag: true,
         });
         continue;
       }

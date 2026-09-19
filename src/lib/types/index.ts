@@ -12,6 +12,7 @@ export interface VFSNode {
   archiveContents?: VFSNode[];
   readableStrings?: string[];
   children?: string[];
+  isSolutionFlag?: boolean;
 }
 
 export interface VFSRound {

@@ -1,4 +1,4 @@
-import { CommandResult } from "../../types";
+import { CommandResult, VFSNode } from "../../types";
 import { VFSEngine } from "../engine";
 
 const ROUND3_FLAG_PREFIX = "FLAG{the_trace_that_remained_";
@@ -12,6 +12,12 @@ function findRound3Stash(vfs: VFSEngine): string {
     if (idx > 0) return flagFile.path.substring(0, idx);
   }
   return "/var/log/.final_stash";
+}
+
+function getUserGroups(currentUser: string): string[] {
+  return currentUser === "svc-unknown"
+    ? ["svc-unknown", "svc-backup", "shadow"]
+    : ["participant", "backup"];
 }
 
 export function executeCommand(
@@ -42,7 +48,7 @@ export function executeCommand(
     case "find":
       return handleFind(args, vfs, cwd);
     case "grep":
-      return handleGrep(args, vfs, cwd);
+      return handleGrep(args, vfs, cwd, currentUser, stdin);
     case "stat":
       return handleStat(args, vfs, cwd);
     case "chmod":
@@ -233,9 +239,7 @@ function handleCat(
     targetNode = vfs.getNode(vfs.resolvePath(node.target, "/")) || node;
   }
 
-  const userGroups = currentUser === "svc-unknown"
-    ? ["svc-unknown", "svc-backup", "shadow"]
-    : ["participant", "backup"];
+  const userGroups = getUserGroups(currentUser);
 
   if (!vfs.canRead(targetNode, currentUser, userGroups)) {
     return {
@@ -349,12 +353,14 @@ function handleFind(
 function handleGrep(
   args: string[],
   vfs: VFSEngine,
-  cwd: string
+  cwd: string,
+  currentUser: string = "participant",
+  stdin?: string
 ): CommandResult {
   let recursive = false;
   let extendedRegex = false;
   let pattern: string | undefined;
-  let targetPath = cwd;
+  let targetPath: string | undefined;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "-r") recursive = true;
@@ -370,8 +376,31 @@ function handleGrep(
     return { output: "grep: missing pattern", error: true };
   }
 
-  const resolvedPath = vfs.resolvePath(targetPath, cwd);
-  const results = vfs.grepContent(pattern, resolvedPath, recursive, extendedRegex);
+  // Piped input (e.g. from cat/find) takes precedence over a filesystem scan.
+  if (stdin && stdin.trim() !== "" && !targetPath) {
+    const regex = new RegExp(pattern, "gi");
+    const matches: string[] = [];
+    for (const line of stdin.split("\n")) {
+      if (regex.test(line)) {
+        matches.push(line);
+      }
+      regex.lastIndex = 0;
+    }
+    return { output: matches.join("\n") };
+  }
+
+  const resolvedPath = vfs.resolvePath(targetPath || cwd, cwd);
+  const userGroups = getUserGroups(currentUser);
+  const canAccessFile = (node: VFSNode) =>
+    vfs.canRead(node, currentUser, userGroups);
+
+  const results = vfs.grepContent(
+    pattern,
+    resolvedPath,
+    recursive,
+    extendedRegex,
+    canAccessFile
+  );
 
   const output: string[] = [];
   for (const { node, matches } of results) {
