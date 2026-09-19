@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { PixelSoldier } from "@/components/pixel-art";
+import { formatTimestamp, formatDate } from "@/lib/format-time";
+import { useUserTimeZone } from "@/lib/use-user-timezone";
 
 interface DashboardProps {
   totalUsers: number;
@@ -71,32 +73,6 @@ interface DashboardProps {
   }>;
 }
 
-function formatTimestamp(value: string | null | undefined) {
-  if (!value) return "-";
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
-
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(date);
-
-  const field = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
-
-  return `${field("year")}-${field("month")}-${field("day")} ${field("hour")}:${field("minute")}:${field("second")} IST`;
-}
-
-function formatDate(value: string | null | undefined) {
-  return formatTimestamp(value).slice(0, 10);
-}
-
 function getLocalDatetime(isoString: string | null | undefined) {
   if (!isoString) return "";
   const d = new Date(isoString);
@@ -129,6 +105,11 @@ export function DashboardClient({
   const [scoreLeaderboard, setScoreLeaderboard] = useState(scoreLeaderboardData);
   const [leaderboardRound, setLeaderboardRound] = useState<1 | 2 | 3>(1);
   const [leaderboardUpdatedAt, setLeaderboardUpdatedAt] = useState<string | null>(null);
+  const [redisStatus, setRedisStatus] = useState<"online" | "offline" | "disabled" | "unknown">("unknown");
+  const [redisCachedRows, setRedisCachedRows] = useState<number | null>(null);
+  const [redisUpdatedAt, setRedisUpdatedAt] = useState<string | null>(null);
+  const [refreshingCache, setRefreshingCache] = useState(false);
+  const { timezone } = useUserTimeZone();
 
   const roundWinners = [1, 2, 3].map((round) => ({
     round,
@@ -156,13 +137,13 @@ export function DashboardClient({
     const row = (cells: unknown[]) => parts.push(cells.map(csvEscape).join(","));
 
     section(`SCORE LEADERBOARD (ROUND ${leaderboardRound})`);
-    row(["Rank", "User", "Score", "Completed At (IST)"]);
+    row(["Rank", "User", "Score", "Completed At (Local)"]);
     roundScoreLeaderboard.forEach((l, index) =>
       row([
         index + 1,
         l.users?.name ? `${l.users.name} (${l.users.email})` : l.users?.email || "Unknown",
         l.score ?? "",
-        formatTimestamp(l.completed_at),
+        formatTimestamp(l.completed_at, timezone),
       ])
     );
 
@@ -185,7 +166,7 @@ export function DashboardClient({
     section("USERS (ALL)");
     row(["Email", "Name", "User ID", "Role", "Joined Date"]);
     allUsers.forEach((u) =>
-      row([u.email, u.name || "", u.id, u.role, formatDate(u.created_at)])
+      row([u.email, u.name || "", u.id, u.role, formatDate(u.created_at, timezone)])
     );
 
     section("ROUND SCHEDULE & LOCKS");
@@ -202,8 +183,8 @@ export function DashboardClient({
         p.round_id,
         p.status,
         p.score ?? "",
-        formatTimestamp(p.started_at),
-        formatTimestamp(p.completed_at),
+        formatTimestamp(p.started_at, timezone),
+        formatTimestamp(p.completed_at, timezone),
       ])
     );
 
@@ -215,7 +196,7 @@ export function DashboardClient({
         a.round_id,
         a.flag,
         a.correct ? "CORRECT" : "WRONG",
-        formatTimestamp(a.submitted_at),
+        formatTimestamp(a.submitted_at, timezone),
       ])
     );
 
@@ -224,7 +205,7 @@ export function DashboardClient({
     cheatAttempts.forEach((c) => {
       const submitterEmail = allUsers.find((u) => u.id === c.submitter_id)?.email || c.submitter_id;
       const ownerEmail = allUsers.find((u) => u.id === c.owner_id)?.email || c.owner_id;
-      row([submitterEmail, ownerEmail, c.round_id, c.flag, c.status.toUpperCase(), formatTimestamp(c.detected_at)]);
+      row([submitterEmail, ownerEmail, c.round_id, c.flag, c.status.toUpperCase(), formatTimestamp(c.detected_at, timezone)]);
     });
 
     section("ROUND WINNERS");
@@ -234,7 +215,7 @@ export function DashboardClient({
         round,
         winner?.users?.name || "Not won yet",
         winner?.users?.email || "",
-        winner ? formatTimestamp(winner.submitted_at) : "",
+        winner ? formatTimestamp(winner.submitted_at, timezone) : "",
         winner?.flag || "",
       ])
     );
@@ -242,7 +223,7 @@ export function DashboardClient({
     section("LEADERBOARD (CORRECT FLAGS)");
     row(["Rank", "User", "Round", "Time", "Flag"]);
     leaderboardData.forEach((l, index) =>
-      row([index + 1, l.users?.email || "Unknown", l.round_id, formatTimestamp(l.submitted_at), l.flag])
+      row([index + 1, l.users?.email || "Unknown", l.round_id, formatTimestamp(l.submitted_at, timezone), l.flag])
     );
 
     section("SCORE LEADERBOARD (HIGHEST POINTS)");
@@ -260,7 +241,7 @@ export function DashboardClient({
           l.users?.name ? `${l.users.name} (${l.users.email})` : l.users?.email || "Unknown",
           l.round_id,
           l.score ?? "",
-          formatTimestamp(l.completed_at),
+          formatTimestamp(l.completed_at, timezone),
         ])
       );
 
@@ -293,6 +274,18 @@ export function DashboardClient({
           setScoreLeaderboard(data.data);
           setLeaderboardUpdatedAt(new Date().toLocaleTimeString());
         }
+        if (!cancelled && data.cache) {
+          setRedisStatus(
+            !data.cache.configured
+              ? "disabled"
+              : data.cache.online
+                ? "online"
+                : "offline"
+          );
+          if (typeof data.cache.cachedRows === "number") {
+            setRedisCachedRows(data.cache.cachedRows);
+          }
+        }
       } catch {
         // Keep showing the previous snapshot if a refresh fails.
       }
@@ -304,6 +297,41 @@ export function DashboardClient({
       clearInterval(interval);
     };
   }, []);
+
+  const handleRefreshRedisCache = async () => {
+    setRefreshingCache(true);
+    setRedisUpdatedAt(null);
+    try {
+      const res = await fetch("/api/admin/leaderboard", {
+        method: "POST",
+        cache: "no-store",
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (Array.isArray(data.data)) {
+          setScoreLeaderboard(data.data);
+          setLeaderboardUpdatedAt(new Date().toLocaleTimeString());
+        }
+        setRedisUpdatedAt(new Date().toLocaleTimeString());
+        if (data.cache) {
+          setRedisStatus(
+            !data.cache.configured
+              ? "disabled"
+              : data.cache.online
+                ? "online"
+                : "offline"
+          );
+          if (typeof data.cache.cachedRows === "number") {
+            setRedisCachedRows(data.cache.cachedRows);
+          }
+        }
+      }
+    } catch {
+      // Fall through; keep current snapshot.
+    } finally {
+      setRefreshingCache(false);
+    }
+  };
 
   const handleUpdateRoundSchedule = async (roundNumber: number, unlockDate: string, isActive: boolean) => {
     setSavingRound(roundNumber);
@@ -642,7 +670,7 @@ export function DashboardClient({
                             {highestProgress?.score || "-"}
                           </td>
                           <td className="py-2 text-[#666]">
-                            {highestProgress?.completed_at ? formatTimestamp(highestProgress.completed_at) : "-"}
+                            {highestProgress?.completed_at ? formatTimestamp(highestProgress.completed_at, timezone) : "-"}
                           </td>
                         </tr>
                       );
@@ -699,7 +727,7 @@ export function DashboardClient({
                         </span>
                       </td>
                       <td className="py-2 text-[#666]">
-                        {formatTimestamp(a.submitted_at)}
+                        {formatTimestamp(a.submitted_at, timezone)}
                       </td>
                     </tr>
                   ))}
@@ -752,7 +780,7 @@ export function DashboardClient({
                           </span>
                         </td>
                         <td className="py-2 text-[#666]">
-                          {formatTimestamp(c.detected_at)}
+                          {formatTimestamp(c.detected_at, timezone)}
                         </td>
                       </tr>
                     ))}
@@ -795,7 +823,7 @@ export function DashboardClient({
                     <tr className="border-b border-[#1a472a]">
                       <th className="text-left py-2 text-[#666]">Rank</th>
                       <th className="text-left py-2 text-[#666]">User</th>
-                      <th className="text-left py-2 text-[#666]">Time (IST)</th>
+                      <th className="text-left py-2 text-[#666]">Time (Local)</th>
                     </tr>
                   </thead>
 <tbody>
@@ -805,7 +833,7 @@ export function DashboardClient({
                         <td className="py-2 text-[#00ff41]">
                           {l.users?.name ? `${l.users.name} (${l.users.email})` : l.users?.email || "Unknown"}
                         </td>
-                        <td className="py-2 text-[#666]">{formatTimestamp(l.submitted_at)}</td>
+                        <td className="py-2 text-[#666]">{formatTimestamp(l.submitted_at, timezone)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -822,6 +850,32 @@ export function DashboardClient({
                 SCORE LEADERBOARD (HIGHEST POINTS)
               </h2>
               <div className="flex items-center gap-3">
+                <span
+                  className={`font-terminal text-sm px-2 py-1 ${
+                    redisStatus === "online"
+                      ? "bg-[#00ff41]/20 text-[#00ff41]"
+                      : redisStatus === "offline"
+                        ? "bg-red-500/20 text-red-500"
+                        : "bg-[#666]/20 text-[#666]"
+                  }`}
+                >
+                  REDIS: {redisStatus.toUpperCase()}
+                  {redisCachedRows !== null && redisStatus === "online"
+                    ? ` (${redisCachedRows} ROWS)`
+                    : ""}
+                </span>
+                <button
+                  onClick={handleRefreshRedisCache}
+                  disabled={refreshingCache}
+                  className="pixel-btn text-xs bg-[#ffb000] text-black font-bold py-2 px-4 hover:bg-[#ffc000] disabled:opacity-60"
+                >
+                  {refreshingCache ? "SYNCING..." : "REFRESH REDIS CACHE"}
+                </button>
+                {redisUpdatedAt && (
+                  <span className="font-terminal text-sm text-[#00ff41]">
+                    CACHE SYNCED {redisUpdatedAt}
+                  </span>
+                )}
                 <button
                   onClick={handleDownloadLeaderboardCSV}
                   className="pixel-btn text-xs bg-[#ffb000] text-black font-bold py-2 px-4 hover:bg-[#ffc000]"
@@ -836,7 +890,7 @@ export function DashboardClient({
               </div>
             </div>
             <p className="font-terminal text-sm text-[#666] mb-6">
-              Ranks players by score for the selected round — highest points first. Refreshes automatically every 5 seconds.
+              Ranks players by score for the selected round — highest points first. Refreshes automatically every 5 seconds, reading directly from the database. Use <span className="text-[#ffb000]">REFRESH REDIS CACHE</span> to push the latest database state to the Redis cache used by the public leaderboard.
             </p>
 
             <div className="flex gap-2 mb-6 flex-wrap">
@@ -866,7 +920,7 @@ export function DashboardClient({
                       <th className="text-left py-2 text-[#666]">Rank</th>
                       <th className="text-left py-2 text-[#666]">User</th>
                       <th className="text-left py-2 text-[#666]">Score</th>
-                      <th className="text-left py-2 text-[#666]">Completed At (IST)</th>
+                      <th className="text-left py-2 text-[#666]">Completed At (Local)</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -881,7 +935,7 @@ export function DashboardClient({
                         <td className="py-2 pr-4 text-xl text-[#00ff41] font-sans font-bold tabular-nums">
                           {l.score ?? "-"}
                         </td>
-                        <td className="py-2 text-[#666]">{formatTimestamp(l.completed_at)}</td>
+                        <td className="py-2 text-[#666]">{formatTimestamp(l.completed_at, timezone)}</td>
                       </tr>
                     ))}
                   </tbody>

@@ -215,6 +215,13 @@ export function GameClient({
               );
             })}
 
+            <Link
+              href="/leaderboard"
+              className="font-pixel text-[9px] text-[#00ff41] hover:text-[#ffb000] transition-colors px-2 py-1 border border-[#1a472a] hover:border-[#ffb000]"
+            >
+              LEADERBOARD
+            </Link>
+
             <button
               onClick={handleLogout}
               className="font-pixel text-[9px] text-[#ffb000] hover:text-red-500 transition-colors px-2 py-1 border border-[#1a472a] hover:border-red-500"

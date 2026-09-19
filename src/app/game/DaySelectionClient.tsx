@@ -204,6 +204,12 @@ export function DaySelectionClient({ progress, rounds }: DaySelectionProps) {
         </div>
         <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
           <button
+            onClick={() => router.push("/leaderboard")}
+            className="pixel-btn text-xs bg-[#1a472a] text-[#00ff41] border border-[#00ff41]/50 px-4 py-2 hover:bg-[#00ff41] hover:text-black"
+          >
+            LEADERBOARD
+          </button>
+          <button
             onClick={() => setShowBriefing(true)}
             className="pixel-btn text-xs bg-[#1a472a] text-[#00ff41] border border-[#00ff41]/50 px-4 py-2 hover:bg-[#00ff41] hover:text-black"
           >

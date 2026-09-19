@@ -17,15 +17,17 @@
  *   npx tsx scripts/restore-scores.ts --apply  # write changes to the database
  */
 
-import { createAdminClient } from "../src/lib/supabase/admin";
-
 try {
   process.loadEnvFile(".env.local");
 } catch {
   console.warn("[warn] could not load .env.local, falling back to environment.");
 }
 
+const { createAdminClient } = await import("../src/lib/supabase/admin");
+const { invalidateScoreLeaderboard } = await import("../src/lib/score-leaderboard");
+
 const APPLY = process.argv.includes("--apply");
+export {};
 
 const supabase = createAdminClient();
 
@@ -135,6 +137,9 @@ async function main() {
   );
   if (!APPLY) {
     console.log("Dry run only — rerun with --apply to write changes.");
+  } else if (restored > 0) {
+    await invalidateScoreLeaderboard();
+    console.log("Leaderboard cache invalidated.");
   }
   console.log();
 }

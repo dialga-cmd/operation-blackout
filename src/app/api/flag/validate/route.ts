@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getTodayDate } from "@/lib/crypto/flag-key";
 import { buildExpectedFlag, DECOY_FLAGS } from "@/lib/server/flag-answer";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { refreshScoreLeaderboard } from "@/lib/score-leaderboard";
 
 export async function POST(request: Request) {
   try {
@@ -230,6 +231,8 @@ export async function POST(request: Request) {
             .eq("round_id", roundId),
         ]);
 
+        await refreshScoreLeaderboard();
+
         return NextResponse.json({
           success: false,
           message:
@@ -290,6 +293,8 @@ export async function POST(request: Request) {
           });
         }
       }
+
+      await refreshScoreLeaderboard();
 
       return NextResponse.json({
         success: true,

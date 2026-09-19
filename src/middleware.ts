@@ -33,8 +33,13 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const isWebhookPath = request.nextUrl.pathname.startsWith(
+    "/api/leaderboard/refresh"
+  );
+
   if (
     !user &&
+    !isWebhookPath &&
     (request.nextUrl.pathname.startsWith("/game") ||
       request.nextUrl.pathname.startsWith("/dashboard") ||
       request.nextUrl.pathname.startsWith("/api/"))
